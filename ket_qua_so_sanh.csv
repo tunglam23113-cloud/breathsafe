@@ -1,0 +1,6 @@
+﻿Mô hình,Recall (Cao),Bỏ sót (Cao),F1 macro,ECE,Brier,Accuracy,Đạt mục tiêu
+Chỉ Rule Engine,0.8333,0.1667,0.7145,,,0.71,✗
+Logistic Regression,0.8333,0.1667,0.8254,0.027,0.0395,0.8333,✗
+Decision Tree,0.9333,0.0667,0.8742,0.0237,0.0278,0.8767,✓
+Chỉ AI (RF + hiệu chuẩn),0.85,0.15,0.9037,0.0281,0.0234,0.91,✗
+HỆ THỐNG ĐẦY ĐỦ (Rule + AI + Hậu kiểm),0.9333,0.0667,0.7696,,,0.76,✓

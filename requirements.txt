@@ -1,0 +1,21 @@
+# Thư viện cần cài cho BreathSafe.
+# Cài tất cả bằng lệnh:  pip install -r requirements.txt
+#
+# Ghi rõ phiên bản chính xác (dấu ==) để bất kỳ ai chạy lại cũng ra kết quả y
+# hệt. Đây là yêu cầu "reproducibility" của nghiên cứu khoa học — giám khảo có
+# thể hỏi: "chạy lại có ra đúng số này không?"
+
+# health-core: thư viện công cụ ML cho sàng lọc nguy cơ sức khỏe.
+# Chứa phần hiệu chuẩn xác suất, phát hiện ca lạ, xử lý âm thanh, vòng lặp
+# phản hồi chuyên gia. Cài từ PyPI như mọi thư viện khác.
+#
+# GHI CHÚ: thư viện này do phụ huynh viết và đăng lên PyPI, không phải học sinh
+# viết. Xem bảng "ai làm gì" trong README.md.
+health-core[audio,plot]==0.1.0
+
+# Giao diện web
+streamlit==1.41.1
+
+# Các thư viện dưới đây được health-core tự cài kèm. Ghi lại ở đây để biết
+# chính xác phiên bản nào đã dùng khi chạy thí nghiệm:
+#   numpy, pandas, scikit-learn, scipy, joblib, librosa, matplotlib

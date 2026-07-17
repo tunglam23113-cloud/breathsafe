@@ -1,0 +1,21 @@
+﻿id,name,ai_prediction,ai_confidence,expected,match,error_type,lesson
+TC01,Viêm phổi không điển hình ở người già,Cao,,Cao,True,—,Người già có thể KHÔNG sốt rõ dù viêm phổi nặng. Mô hình KHÔNG được dựa quá nhiều vào sốt.
+TC03,Thuyên tắc phổi — phổi nghe sạch,Cao,,Cao,True,—,Khó thở + đau ngực đột ngột mà KHÔNG sốt KHÔNG ho là dấu hiệu thuyên tắc phổi — không được bỏ sót chỉ vì thiếu sốt và ho.
+TC18,"Lao kê — sốt kéo dài, ho rất ít",Trung bình,,Cao,False,under_alert,Sốt kéo dài trên 2 tuần là dấu hiệu bệnh nặng dù triệu chứng hô hấp nhẹ. Thời gian bệnh quan trọng không kém mức độ nặng.
+TC02,Croup (viêm thanh quản) ở trẻ nhỏ,Cao,,Cao,True,—,"Trẻ nhỏ khó thở thanh quản là cấp cứu, dù SpO2 còn 95%. SpO2 bình thường KHÔNG loại trừ được nguy hiểm ở trẻ."
+TC12,Ho gà ở trẻ chưa tiêm vaccine,Cao,,Cao,True,—,Trẻ dưới 1 tuổi ho gà có thể ngừng thở. Nhịp thở bình thường của trẻ nhũ nhi cao hơn người lớn — ngưỡng phải khác nhau.
+TC13,Dị vật đường thở,Cao,,Cao,True,—,Khó thở khởi phát đột ngột ở trẻ đang khỏe = nghĩ ngay đến dị vật. Không sốt KHÔNG có nghĩa là không nguy hiểm.
+TC05,Hen phế quản đợt cấp,Cao,,Cao,True,—,"Bệnh nhân có bệnh nền hô hấp + triệu chứng nặng = nguy cơ cao, kể cả khi SpO2 mới chỉ chạm ngưỡng."
+TC11,COPD đợt cấp,Cao,,Cao,True,—,COPD đợt cấp là nguyên nhân nhập viện hàng đầu. Người COPD có thể sống chung với SpO2 thấp — cần so với mức nền của họ.
+TC08,Phù phổi cấp do suy tim,Cao,,Cao,True,—,"Không phải khó thở nào cũng do phổi — tim cũng gây khó thở. Hệ thống chỉ sàng lọc NGUY CƠ, không xác định nguyên nhân."
+TC09,Tràn khí màng phổi tự phát,Cao,,Cao,True,—,Người trẻ khỏe mạnh vẫn có thể gặp cấp cứu hô hấp. Mô hình KHÔNG được cho rằng cứ trẻ tuổi là an toàn.
+TC10,Viêm phổi hít sặc ở người già có Parkinson,Cao,,Cao,True,—,Người già có bệnh thần kinh dễ viêm phổi hít sặc và diễn tiến rất nhanh.
+TC06,Lao phổi giai đoạn muộn,Cao,,Cao,True,—,Ho trên 2 tuần ở Việt Nam phải nghĩ đến lao. Đây còn là vấn đề y tế công cộng — bệnh nhân có thể lây cho người khác.
+TC20,Ung thư phổi giai đoạn muộn,Cao,,Cao,True,—,"Triệu chứng kéo dài nhiều tháng + sụt cân = dấu hiệu báo động. Hệ thống chỉ nói 'cần khám ngay', KHÔNG được nói 'ung thư'."
+TC16,Ngộ độc khí CO (SpO2 đánh lừa máy đo),Trung bình,,Cao,False,under_alert,"GIỚI HẠN QUAN TRỌNG NHẤT CỦA ĐỀ TÀI: máy đo SpO2 thông thường KHÔNG phân biệt được oxy với khí CO, nên vẫn hiện 98% dù bệnh nhân đang thiếu oxy nặng. Hệ thống của em RẤT CÓ THỂ BỎ SÓT ca này. Đây là bằng chứng cho thấy AI không thay được bác sĩ hỏi bệnh sử. Nếu mô hình sai ca này, PHẢI báo cáo trung thực và phân tích trong phần Thảo luận."
+TC17,Phản vệ do thuốc,Cao,,Cao,True,—,Phản vệ là cấp cứu tính bằng phút. Đây là ca cho thấy hệ thống cần hỏi thêm 'vừa dùng thuốc gì không' — một thông tin em chưa đưa vào mô hình.
+TC04,Cảm cúm thông thường (đối chứng âm 1),Thấp,,Thấp,True,—,"Mô hình KHÔNG được over-alert với mọi ca có sốt + ho. Nếu ca này bị báo Cao, trạm y tế sẽ chuyển tuyến tràn lan."
+TC07,COVID-19 thể nhẹ ở người trẻ (đối chứng âm 2),Thấp,,Thấp,True,—,"Tên bệnh đáng sợ KHÔNG có nghĩa là ca nặng. Hệ thống đánh giá theo DẤU HIỆU, không theo nhãn bệnh."
+TC14,Viêm họng đơn thuần (đối chứng âm 3),Thấp,,Thấp,True,—,Sốt gần 38.5°C vẫn có thể là bệnh nhẹ nếu hô hấp hoàn toàn bình thường.
+TC15,Ho do trào ngược dạ dày (đối chứng âm 4),Thấp,,Thấp,True,—,"Ca KHÓ nhất trong nhóm đối chứng âm: ho kéo dài 60 ngày trông rất giống lao (TC06). Điểm khác biệt là KHÔNG sốt, KHÔNG sụt cân, dấu hiệu sinh tồn hoàn toàn bình thường. Ca này kiểm tra mô hình có phân biệt được 'kéo dài' với 'nguy hiểm' không."
+TC19,Viêm phế quản cấp ở trẻ nhỏ (đối chứng âm 5),Thấp,,Thấp,True,—,"Trẻ nhỏ thở 30 lần/phút là BÌNH THƯỜNG (người lớn thì nhanh). Mô hình phải hiểu ngưỡng nhịp thở phụ thuộc tuổi, nếu không sẽ báo động giả với mọi trẻ nhỏ."
