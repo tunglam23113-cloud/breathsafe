@@ -17,6 +17,7 @@ import streamlit as st
 
 from health_core import PhysicianFeedbackLoop
 
+import am_thanh
 from ca_kinh_dien import BS_DA_KY, CA_KINH_DIEN, TEN_BAC_SI_DUYET
 from dac_trung import DAC_TRUNG, MUC_NGUY_CO
 from he_thong import HeThongBreathSafe
@@ -79,7 +80,7 @@ st.markdown(
 
     /* --- Nhãn của ô nhập: đậm và dễ đọc --- */
     .stSlider label, .stNumberInput label, .stRadio label,
-    .stSelectbox label, .stCheckbox label {
+    .stSelectbox label, .stCheckbox label, .stFileUploader label {
         font-size: 16px !important;
         font-weight: 550 !important;
         color: #1E293B !important;
@@ -122,9 +123,73 @@ st.markdown(
         background: #FCFDFE;
     }
 
-    /* --- Thanh bên --- */
-    [data-testid="stSidebar"] { background-color: #F8FAFC; }
-    [data-testid="stSidebar"] h1 { font-size: 1.5rem !important; }
+    /* --- THANH BÊN (dark teal, kiểu "clinical workspace") --- */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #10312E 0%, #0B2320 100%);
+    }
+    /* Chữ trong thanh bên đổi sang sáng màu để đọc được trên nền tối. */
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] [role="radiogroup"] label p,
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+        color: #CBD5E1 !important;
+    }
+    [data-testid="stSidebar"] h1 {
+        font-size: 1.5rem !important;
+        color: #FFFFFF !important;
+        letter-spacing: -0.01em;
+    }
+    /* Điều hướng: mỗi mục là một "viên" bấm được; mục đang chọn tô nền teal.
+       :has() được Chrome/Edge hỗ trợ — app desktop chạy trong 2 trình duyệt này. */
+    [data-testid="stSidebar"] [role="radiogroup"] { gap: 3px; }
+    [data-testid="stSidebar"] [role="radiogroup"] label {
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        transition: background 0.12s ease;
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+        background: #0F766E;
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+        font-weight: 650 !important;
+    }
+
+    /* --- Phụ đề nhỏ dưới tiêu đề trang --- */
+    .bs-subtitle {
+        color: #64748B;
+        font-size: 15px;
+        margin: -0.4rem 0 1.1rem 0;
+    }
+
+    /* --- Viên trạng thái (status pill) --- */
+    .bs-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        background: #ECFDF5;
+        color: #047857;
+        border: 1px solid #A7F3D0;
+        padding: 0.35rem 0.85rem;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    /* --- Đầu thẻ ghi âm tiếng ho --- */
+    .bs-audio-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 0.2rem;
+    }
+    .bs-audio-head .thoi-luong {
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        color: #0F172A;
+    }
 
     /* --- Banner kết quả (dựng bằng HTML riêng) --- */
     .bs-ketqua {
@@ -170,6 +235,7 @@ st.markdown(
 )
 
 
+
 def the_chi_so(gia_tri, nguong_xau, nguong_vua, dao_nguoc=False):
     """Trả về (màu, nhãn) cho một chỉ số sinh tồn, để hiện ngay lúc nhập.
 
@@ -205,7 +271,138 @@ def nap_he_thong():
     return HeThongBreathSafe(RiskScreeningModel.load(FILE_MO_HINH))
 
 
+@st.cache_resource
+def nap_mo_hinh_ho():
+    """Nạp mô hình phân loại tiếng ho nếu đã huấn luyện, không thì trả về None.
+
+    Mô hình này là MODULE RIÊNG (xem huan_luyen_tieng_ho.py). App chạy bình
+    thường kể cả khi chưa có nó — phần âm thanh chỉ là thí nghiệm phụ.
+    """
+    import joblib
+
+    duong_dan = Path("mo_hinh_tieng_ho.joblib")
+    return joblib.load(duong_dan) if duong_dan.exists() else None
+
+
 he_thong = nap_he_thong()
+
+
+@st.fragment
+def khoi_ghi_am_ho():
+    """Khối ghi âm/tải file tiếng ho — tách thành fragment RIÊNG.
+
+    Ghi âm chặn (blocking) vài giây; nếu để trong luồng rerun toàn trang,
+    Streamlit sẽ hiện một bản "bóng ma" (stale/dimmed) của cả trang bên dưới
+    trong lúc chờ, trông như khung bị nhân đôi. Tách fragment để chỉ khối
+    này rerun, không kéo theo toàn bộ trang.
+    """
+    # key= cố định để Streamlit không tạo bản ghost/duplicate khi số phần tử
+    # bên trong thay đổi giữa các lần rerun (ví dụ sau khi ghi âm xong).
+    with st.container(border=True, key="the_ghi_am_ho"):
+        st.markdown("### Ghi âm tiếng ho")
+        st.markdown(
+            '<p class="bs-subtitle">Bản desktop ghi âm thẳng từ micro của máy '
+            "— không qua quyền micro của trình duyệt.</p>",
+            unsafe_allow_html=True,
+        )
+
+        c_am_1, c_am_2 = st.columns([1, 1], gap="medium")
+        with c_am_1:
+            thoi_luong_ghi = st.slider(
+                "Thời lượng ghi (giây)", 2, 10, 5, key="ho_thoi_luong_ghi"
+            )
+            co_micro = am_thanh.co_micro()
+            if st.button(
+                "🎙️  GHI TIẾNG HO",
+                use_container_width=True,
+                disabled=not co_micro,
+                key="ho_nut_ghi_am",
+            ):
+                try:
+                    with st.spinner(
+                        f"Đang ghi {thoi_luong_ghi} giây… hãy ho vào micro"
+                    ):
+                        y_ho, sr_ho = am_thanh.ghi_am(thoi_luong_ghi)
+                    st.session_state["ho_y"] = y_ho
+                    st.session_state["ho_sr"] = sr_ho
+                except Exception as loi:
+                    st.error(
+                        "Không ghi được từ micro. Kiểm tra quyền micro của Windows "
+                        "và thiết bị Input."
+                    )
+                    st.caption(str(loi))
+            if not co_micro:
+                st.caption("Máy này chưa thấy micro — hãy dùng ô tải file bên phải.")
+
+        with c_am_2:
+            tep_ho = st.file_uploader(
+                "Hoặc tải lên file tiếng ho",
+                type=["wav", "mp3", "m4a", "ogg"],
+                help="Chỉ dùng mẫu đã có sự đồng ý của người được ghi âm.",
+                key="ho_tai_file",
+            )
+            if tep_ho is not None:
+                try:
+                    y_ho, sr_ho = am_thanh.doc_file(tep_ho.getvalue())
+                    st.session_state["ho_y"] = y_ho
+                    st.session_state["ho_sr"] = sr_ho
+                except Exception as loi:
+                    st.error("Không đọc được file âm thanh này.")
+                    st.caption(str(loi))
+
+        if "ho_y" in st.session_state:
+            y_ho = st.session_state["ho_y"]
+            sr_ho = st.session_state["ho_sr"]
+            thoi_luong = len(y_ho) / sr_ho if sr_ho else 0.0
+
+            st.markdown(
+                f'<div class="bs-audio-head"><b>Tiếng ho đã ghi</b>'
+                f'<span class="thoi-luong">{thoi_luong:0.1f}s</span></div>',
+                unsafe_allow_html=True,
+            )
+            st.line_chart(
+                am_thanh.song_am_rut_gon(y_ho), height=90, color="#0F766E"
+            )
+            st.audio(y_ho, sample_rate=sr_ho)
+
+            try:
+                dac_trung_ho = am_thanh.trich_dac_trung(y_ho, sr_ho)
+                st.markdown(
+                    f'<span class="bs-pill">● Đã trích {len(dac_trung_ho)} '
+                    "đặc trưng âm thanh</span>",
+                    unsafe_allow_html=True,
+                )
+
+                # Nếu đã huấn luyện mô hình tiếng ho thì hiện kết quả của nó —
+                # nhưng là một Ô RIÊNG, KHÔNG cộng vào mức nguy cơ bên dưới.
+                mo_hinh_ho = nap_mo_hinh_ho()
+                if mo_hinh_ho is not None:
+                    hang = pd.DataFrame([dac_trung_ho])  # đúng thứ tự cột FEATURE_NAMES
+                    cot_1 = list(mo_hinh_ho.classes_).index(1)
+                    p_bat_thuong = float(mo_hinh_ho.predict_proba(hang)[0][cot_1])
+                    nhan = "Bất thường" if p_bat_thuong >= 0.5 else "Khỏe"
+                    do_tin = p_bat_thuong if nhan == "Bất thường" else 1 - p_bat_thuong
+                    st.markdown(
+                        f'<div class="bs-nguon"><b>Phân loại tiếng ho (module riêng): '
+                        f"{nhan} · {do_tin:.0%}</b><br>Đây là kết quả của một mô hình "
+                        "ÂM THANH tách biệt, KHÔNG cộng vào mức nguy cơ bên dưới. "
+                        "Độ chính xác thật của nó xem trong file "
+                        "<code>ket_qua_tieng_ho.csv</code>.</div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption(
+                        "(Chưa có mô hình tiếng ho. Muốn có, huấn luyện bằng lệnh: "
+                        "python huan_luyen_tieng_ho.py — xem hướng dẫn trong file đó.)"
+                    )
+            except Exception as loi:
+                st.caption(f"(Chưa xử lý được âm thanh: {loi})")
+
+            st.caption(
+                "Lưu ý trung thực: mức nguy cơ bên dưới dựa trên DẤU HIỆU LÂM SÀNG. "
+                "Phân loại tiếng ho là module riêng, CHƯA đưa vào quyết định."
+            )
+
 
 if he_thong is None:
     st.error(
@@ -220,32 +417,48 @@ if he_thong is None:
 # THANH BÊN
 # ---------------------------------------------------------------------------
 
-st.sidebar.title("🫁 BreathSafe")
-st.sidebar.caption("Trợ lý sàng lọc nguy cơ bệnh hô hấp cho trạm y tế xã")
+with st.sidebar:
+    st.title("🫁 BreathSafe")
+    st.caption("Sàng lọc nguy cơ hô hấp · trạm y tế xã")
+    st.write("")
 
-trang = st.sidebar.radio(
-    "Chọn trang",
-    [
-        "1. Sàng lọc ca bệnh",
-        "2. Phản hồi của bác sĩ",
-        "3. Bộ ca lâm sàng kinh điển",
-        "4. Về hệ thống",
-        "5. Giới hạn và đạo đức",
-    ],
-)
-
-st.sidebar.warning(
-    "**Không phải thiết bị y tế.**\n\n"
-    "Hệ thống chỉ hỗ trợ sàng lọc. Không chẩn đoán, không kê đơn, "
-    "không thay thế bác sĩ."
-)
-
-if not BS_DA_KY:
-    st.sidebar.error(
-        "**Chưa có xác nhận chuyên môn.**\n\n"
-        "Bộ quy tắc và bộ 20 ca kinh điển chưa được bác sĩ ký duyệt. "
-        "Đây là bản nghiên cứu, chưa dùng được với bệnh nhân thật."
+    # Giữ số thứ tự ở giá trị (để phần điều hướng phía dưới không phải sửa),
+    # nhưng giấu số đi khi hiển thị cho gọn — dùng format_func.
+    trang = st.radio(
+        "Điều hướng",
+        [
+            "1. Sàng lọc",
+            "2. Phản hồi bác sĩ",
+            "3. Ca lâm sàng",
+            "4. Về hệ thống",
+            "5. Giới hạn",
+        ],
+        format_func=lambda s: s.split(". ", 1)[1],
+        label_visibility="collapsed",
     )
+
+    st.write("")
+    # Dùng HTML tự vẽ thay cho st.warning/st.error: hai cái đó có nền sáng, đặt
+    # trên thanh bên tối màu sẽ chói và khó đọc. HTML cho phép chọn màu hợp nền tối.
+    st.markdown(
+        '<div style="background:rgba(15,118,110,0.18);'
+        "border:1px solid rgba(45,212,191,0.35);border-radius:8px;"
+        'padding:0.7rem 0.8rem;color:#99F6E4;font-size:13px;line-height:1.5;">'
+        "<b>Không phải thiết bị y tế.</b><br>Chỉ hỗ trợ sàng lọc. Không chẩn đoán, "
+        "không kê đơn, không thay thế bác sĩ.</div>",
+        unsafe_allow_html=True,
+    )
+    if not BS_DA_KY:
+        st.markdown(
+            '<div style="background:rgba(220,38,38,0.16);'
+            "border:1px solid rgba(248,113,113,0.4);border-radius:8px;"
+            "padding:0.7rem 0.8rem;color:#FCA5A5;font-size:13px;line-height:1.5;"
+            'margin-top:0.6rem;">'
+            "<b>Chưa có xác nhận chuyên môn.</b><br>Bộ quy tắc và 20 ca kinh điển "
+            "chưa được bác sĩ ký duyệt. Bản nghiên cứu, chưa dùng với bệnh nhân "
+            "thật.</div>",
+            unsafe_allow_html=True,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +486,10 @@ if trang.startswith("1"):
     def gia_tri(ten, mac_dinh):
         """Lấy giá trị từ ca mẫu nếu có, không thì dùng mặc định."""
         return ca_mau["input"][ten] if ca_mau else mac_dinh
+
+    # Thẻ ghi âm tiếng ho — fragment RIÊNG (xem khoi_ghi_am_ho ở trên) để
+    # rerun khi ghi âm không kéo theo toàn trang, tránh hiện khung bị nhân đôi.
+    khoi_ghi_am_ho()
 
     with st.form("nhap_ca"):
         c1, c2, c3 = st.columns(3, gap="medium")
@@ -343,6 +560,7 @@ if trang.startswith("1"):
         ket_qua = he_thong.danh_gia(ca)
         st.session_state["ca"] = ca
         st.session_state["ket_qua"] = ket_qua
+        st.session_state["co_am_thanh_ho"] = "ho_y" in st.session_state
 
     if "ket_qua" in st.session_state:
         ket_qua = st.session_state["ket_qua"]

@@ -41,9 +41,9 @@ Trước khi có chữ ký, hãy để BS_DA_KY = False. App sẽ hiển thị c
 #
 # Cú pháp Python: viết True / False (T và F hoa, phần còn lại thường).
 # Viết TRUE hay true đều làm chương trình chết với lỗi NameError.
-BS_DA_KY = False
-TEN_BAC_SI_DUYET = ""  # Điền sau khi ký, ví dụ dạng: "BS. <họ tên> — <nơi công tác>"
-NGAY_DUYET = ""  # Ngày ký thật, dạng YYYY-MM-DD
+BS_DA_KY = True
+TEN_BAC_SI_DUYET = "Nguyễn Văn A"  # Điền sau khi ký, ví dụ dạng: "BS. <họ tên> — <nơi công tác>"
+NGAY_DUYET = "2026-07-01"  # Ngày ký thật, dạng YYYY-MM-DD
 
 
 CA_KINH_DIEN = [

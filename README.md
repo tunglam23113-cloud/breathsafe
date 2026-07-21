@@ -4,14 +4,33 @@ Trợ lý AI hỗ trợ nhân viên y tế tuyến xã sàng lọc sớm nguy c�
 
 > **Không phải thiết bị y tế.** Hệ thống chỉ hỗ trợ sàng lọc — không chẩn đoán, không kê đơn, không thay thế bác sĩ.
 
-## Chạy thử trong 3 lệnh
+## Cài đặt (làm một lần)
 
 ```bash
 pip install -r requirements.txt
 python tao_du_lieu.py      # sinh 2.000 ca mô phỏng
 python huan_luyen.py       # huấn luyện + đánh giá + lưu mô hình
-streamlit run app.py       # mở giao diện
 ```
+
+## Mở app
+
+**Cách 1 — bản desktop (khuyến nghị khi trình bày):**
+
+> Nhấp đúp vào **`BreathSafe.bat`**
+
+App mở ra như một cửa sổ phần mềm riêng (Chrome/Edge ở chế độ "app", không có
+thanh địa chỉ). Đóng cửa sổ là app tự tắt. Ở bản này, nút **Ghi tiếng ho** thu
+âm THẲNG từ micro của máy bằng Python — không phải xin quyền micro của trình
+duyệt, nên không bị Chrome chặn.
+
+**Cách 2 — bản web (để phát triển):**
+
+```bash
+streamlit run app.py
+```
+
+Mở trong tab trình duyệt bình thường. Micro vẫn hoạt động vì chạy trên
+`localhost`, nhưng bản desktop gọn gàng hơn khi demo.
 
 ## Các file trong thư mục này
 
@@ -24,8 +43,47 @@ streamlit run app.py       # mở giao diện
 | `he_thong.py` | **Ghép 3 lớp an toàn** lại với nhau | Vừa |
 | `huan_luyen.py` | Chia dữ liệu, train 5 mô hình, so sánh, đánh giá | Vừa |
 | `app.py` | Giao diện Streamlit 5 trang | Vừa |
+| `am_thanh.py` | Ghi âm + trích đặc trưng tiếng ho | Vừa |
+| `huan_luyen_tieng_ho.py` | **Train mô hình phân loại tiếng ho** (module riêng) | Vừa |
+| `chay_desktop.py` + `BreathSafe.bat` | Mở app như cửa sổ desktop | Vừa |
 | `retrain.py` | Huấn luyện lại từ phản hồi bác sĩ | Vừa |
 | `tieng_viet.py` | Giúp cửa sổ lệnh Windows in được tiếng Việt | Dễ |
+
+## Mô hình phân loại tiếng ho (module RIÊNG)
+
+App có thể train một mô hình chỉ nghe tiếng ho để đoán "ho của người khỏe" hay
+"ho bất thường". **Đây là một thí nghiệm đứng riêng, KHÔNG cộng vào mức nguy cơ
+của hệ thống chính.** Khi có mô hình, app hiện kết quả của nó trong một ô riêng
+có ghi rõ điều đó.
+
+**Kiểm tra pipeline chạy đúng (không cần dữ liệu):**
+
+```bash
+python huan_luyen_tieng_ho.py --tu-kiem
+```
+
+**Train thật với COUGHVID** (khuyến nghị — dùng nhãn chuyên gia, xem lý do ở phần
+"nên dùng data nào"):
+
+```bash
+# 1. Cài ffmpeg (một lần) vì COUGHVID là file .webm:  winget install Gyan.FFmpeg
+#    Cài xong PHẢI mở cửa sổ lệnh MỚI để nhận ffmpeg.
+# 2. Tải + giải nén COUGHVID: đặt metadata_compiled.csv cạnh script,
+#    file .webm vào thư mục du_lieu_ho/
+python chuan_bi_coughvid.py       # tạo nhan_tieng_ho.csv từ nhãn chuyên gia
+python huan_luyen_tieng_ho.py     # train + đánh giá + lưu mô hình
+```
+
+`chuan_bi_coughvid.py` tự gán nhãn nhị phân theo ĐA SỐ chuyên gia, bỏ qua các
+đoạn mà bác sĩ bất đồng, và **đếm số ca bất đồng đó** — một điểm trung thực đáng
+đưa vào báo cáo. Dùng Coswara (file `.wav`, không cần ffmpeg) cũng được nhưng
+nhãn kém khớp hơn — xem giải thích trong `chuan_bi_coughvid.py` và `huan_luyen_tieng_ho.py`.
+
+> **Nói trung thực khi trình bày:** đừng nói "AI nghe tiếng ho rồi chấm điểm nguy
+> cơ" — điều đó KHÔNG đúng. Mức nguy cơ dựa trên **dấu hiệu lâm sàng** (SpO2, nhịp
+> thở, triệu chứng). Mô hình tiếng ho là module riêng, và theo nhiều nghiên cứu
+> lớn, sàng lọc bệnh qua tiếng ho hoạt động **kém** ngoài thực tế — nên phải báo
+> cáo đúng con số AUC/ECE đo được (xem `ket_qua_tieng_ho.csv`), kể cả khi khiêm tốn.
 
 Toàn bộ **phần kỹ thuật khó** (hiệu chuẩn xác suất, phát hiện ca lạ bằng khoảng cách Mahalanobis, xử lý âm thanh MFCC, cơ chế trọng số khi retrain) nằm trong thư viện [`health-core`](../health-core) — cài bằng `pip install health-core`, dùng như `numpy` hay `pandas`.
 
@@ -123,4 +181,3 @@ Nếu bị hỏi tiếp **"vậy em có hiểu calibration là gì không?"** �
 Giám khảo tra PyPI mất 30 giây: package đăng gần ngày thi, tác giả là người lớn. Nếu bảng "ai làm gì" đã ghi sẵn điều đó thì **không có gì để bới** — người lớn hỗ trợ là chuyện được phép. Nhưng nếu bảng ghi "HS tự làm" mà thực tế không phải, thì lúc đó không chỉ mất điểm phần thư viện: **mọi phần khác trong đề tài đều bị nghi ngờ**, kể cả những phần cháu thật sự tự làm.
 
 Nói cách khác, khai thật chính là thứ bảo vệ công sức thật của cháu.
-"# breathsafe" 
