@@ -41,9 +41,34 @@ Trước khi có chữ ký, hãy để BS_DA_KY = False. App sẽ hiển thị c
 #
 # Cú pháp Python: viết True / False (T và F hoa, phần còn lại thường).
 # Viết TRUE hay true đều làm chương trình chết với lỗi NameError.
-BS_DA_KY = True
-TEN_BAC_SI_DUYET = "Nguyễn Văn A"  # Điền sau khi ký, ví dụ dạng: "BS. <họ tên> — <nơi công tác>"
-NGAY_DUYET = "2026-07-01"  # Ngày ký thật, dạng YYYY-MM-DD
+BS_DA_KY = False
+TEN_BAC_SI_DUYET = ""  # Điền sau khi ký, ví dụ dạng: "BS. <họ tên> — <nơi công tác>"
+NGAY_DUYET = ""  # Ngày ký thật, dạng YYYY-MM-DD
+
+# Những chuỗi "tên ví dụ" mà người ta hay điền tạm rồi quên sửa. Nếu
+# TEN_BAC_SI_DUYET rơi vào danh sách này, hệ thống coi như CHƯA ký — xem
+# da_duyet_hop_le() bên dưới.
+TEN_GIA_MAU = {
+    "", "nguyễn văn a", "nguyen van a", "nguyễn văn b", "nguyen van b",
+    "bs. nguyễn văn a", "bs nguyễn văn a", "abc", "xxx", "...", "tên bác sĩ",
+}
+
+
+def da_duyet_hop_le():
+    """Bộ ca đã thật sự được ký duyệt chưa?
+
+    Chỉ trả về True khi CẢ HAI điều kiện đúng:
+        1. BS_DA_KY = True
+        2. TEN_BAC_SI_DUYET là một cái tên thật, không phải tên ví dụ
+
+    Vì sao cần kiểm tra thêm điều kiện 2? Vì lỗi hay gặp nhất không phải là cố
+    tình nói dối, mà là điền tạm "Nguyễn Văn A" để thử giao diện rồi quên sửa.
+    Khi đó app hiển thị "Bộ ca đã được duyệt bởi: Nguyễn Văn A" — một lời khẳng
+    định sai trước mặt giám khảo. Hàm này chặn đúng trường hợp đó.
+    """
+    if not BS_DA_KY:
+        return False
+    return TEN_BAC_SI_DUYET.strip().lower() not in TEN_GIA_MAU
 
 
 CA_KINH_DIEN = [
@@ -115,8 +140,12 @@ CA_KINH_DIEN = [
         "name": "Ho gà ở trẻ chưa tiêm vaccine",
         "description": "Bé 8 tháng, ho thành cơn dài rồi tím tái, chưa tiêm "
                        "vaccine, ho 10 ngày, sốt nhẹ.",
+        # age = 0 vì cột "age" tính bằng NĂM tròn, mà bé mới 8 tháng. Bản trước
+        # ghi age = 1, tức là hệ thống nhận vào một bé 1 tuổi — mâu thuẫn với cả
+        # phần mô tả lẫn bài học ("trẻ DƯỚI 1 tuổi"), và làm ca này rơi vào
+        # ngưỡng thở nhanh của nhóm 1–4 tuổi (>40) thay vì nhóm nhũ nhi (>50).
         "input": {
-            "age": 1, "fever": 1, "temperature": 38.0, "cough": 1,
+            "age": 0, "fever": 1, "temperature": 38.0, "cough": 1,
             "dyspnea": 1, "spo2": 93, "respiratory_rate": 42,
             "chest_pain": 0, "fatigue": 1, "days_sick": 10, "comorbidity": 0,
         },
@@ -384,6 +413,15 @@ def kiem_tra_bo_ca():
             loi.append(f"{ca['id']} có đặc trưng lạ: {sorted(thua)}")
         if ca["expected_label"] not in ("Thấp", "Trung bình", "Cao"):
             loi.append(f"{ca['id']} có nhãn không hợp lệ: {ca['expected_label']}")
+
+    # Bắt đúng cái bẫy hay gặp: bật cờ đã ký nhưng để nguyên tên ví dụ.
+    if BS_DA_KY and not da_duyet_hop_le():
+        loi.append(
+            f"BS_DA_KY = True nhưng TEN_BAC_SI_DUYET = {TEN_BAC_SI_DUYET!r} "
+            f"trông như tên ví dụ. Điền tên thật, hoặc để BS_DA_KY = False."
+        )
+    if BS_DA_KY and not NGAY_DUYET.strip():
+        loi.append("BS_DA_KY = True nhưng NGAY_DUYET còn để trống.")
 
     return loi
 

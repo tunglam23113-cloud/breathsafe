@@ -26,7 +26,7 @@ from health_core import (
     plot_reliability_diagram,
 )
 
-from ca_kinh_dien import BS_DA_KY, CA_KINH_DIEN
+from ca_kinh_dien import CA_KINH_DIEN, da_duyet_hop_le
 from dac_trung import DAC_TRUNG
 from he_thong import HeThongBreathSafe
 from quy_tac import MoHinhChiQuyTac
@@ -238,17 +238,25 @@ def main():
     ket_qua_ca.to_csv("ket_qua_ca_kinh_dien.csv", index=False, encoding="utf-8-sig")
     print("\nĐã lưu vào: ket_qua_ca_kinh_dien.csv")
 
+    # Dùng len(CA_KINH_DIEN) chứ không gõ cứng "20": thêm hay bớt một ca là
+    # dòng kết luận in ra sai ngay, mà con số này đi thẳng vào báo cáo.
+    n_ca = len(CA_KINH_DIEN)
     khop_ai = int(ca_chi_ai["match"].sum())
     khop_day_du = int(ket_qua_ca["match"].sum())
     print(
-        f"\n  Rule Engine giúp tăng từ {khop_ai}/20 lên {khop_day_du}/20 ca."
+        f"\n  Rule Engine giúp tăng từ {khop_ai}/{n_ca} lên {khop_day_du}/{n_ca} ca."
         if khop_day_du > khop_ai
-        else f"\n  Rule Engine không thay đổi kết quả ({khop_ai}/20)."
+        else f"\n  Rule Engine không thay đổi kết quả ({khop_ai}/{n_ca})."
     )
 
-    if not BS_DA_KY:
+    # Lưu lại cả hai con số để README và báo cáo trích đúng, không phải chép tay.
+    pd.DataFrame(
+        [{"so_ca": n_ca, "khop_chi_ai": khop_ai, "khop_he_thong_day_du": khop_day_du}]
+    ).to_csv("ket_qua_ca_kinh_dien_tong_hop.csv", index=False, encoding="utf-8-sig")
+
+    if not da_duyet_hop_le():
         print(
-            "\n*** LƯU Ý: bộ 20 ca CHƯA có chữ ký bác sĩ. ***\n"
+            f"\n*** LƯU Ý: bộ {n_ca} ca CHƯA có chữ ký bác sĩ. ***\n"
             "Kết quả trên chưa có giá trị chuyên môn để đưa vào báo cáo.\n"
             "Xem hướng dẫn trong file ca_kinh_dien.py."
         )

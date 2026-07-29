@@ -169,7 +169,13 @@ def sinh_mot_ca(rng):
     # Tuổi: mô phỏng dân số đến trạm y tế xã — nhiều trẻ nhỏ và người già.
     nhom_tuoi = rng.choice(["tre", "nguoi_lon", "gia"], p=[0.25, 0.5, 0.25])
     if nhom_tuoi == "tre":
-        tuoi = int(rng.integers(1, 12))
+        # Bắt đầu từ 0, KHÔNG phải 1. Bản trước dùng integers(1, 12) nên trong
+        # 2.000 ca không có lấy một trẻ dưới 1 tuổi nào — trong khi app cho nhập
+        # tuổi từ 0, và bảng nhịp thở có hẳn một nhóm riêng cho lứa này (ngưỡng
+        # 40 lần/phút). Hậu quả: mọi ca nhũ nhi đều là ca LẠ với mô hình, còn
+        # nhánh "tuoi < 1" của nhip_tho_binh_thuong() thì không bao giờ được
+        # dùng tới lúc sinh dữ liệu. Ca TC12 (bé 8 tháng) chính là nhóm này.
+        tuoi = int(rng.integers(0, 12))
     elif nhom_tuoi == "nguoi_lon":
         tuoi = int(rng.integers(12, 65))
     else:

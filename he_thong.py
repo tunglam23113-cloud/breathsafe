@@ -101,6 +101,34 @@ class HeThongBreathSafe:
                 f"{', '.join(TEN_TIENG_VIET.get(t, t) for t in sorted(thieu))}"
             )
 
+        # Có ĐỦ TÊN cột chưa đủ — giá trị bên trong cũng phải là số thật.
+        #
+        # Vì sao phải chặn ở đây? Vì Random Forest của scikit-learn từ bản 1.4
+        # xử lý được giá trị thiếu (NaN) mà KHÔNG báo lỗi: nó tự chọn một nhánh
+        # rồi trả về một dự đoán trông hoàn toàn bình thường, kèm cả phần trăm
+        # độ tin cậy. Thử thật trên ca TC01 bỏ trống SpO2: hệ thống vẫn kết luận
+        # "Cao" — đúng đáp án, nhưng là đúng do may, vì nó không hề đọc được chỉ
+        # số quan trọng nhất. Với một ca khác, nó sẽ tự tin sai y như vậy.
+        #
+        # Ở một công cụ sàng lọc, "không biết" phải khác "bình thường". Thiếu
+        # số đo thì từ chối trả lời, để người dùng đi đo lại.
+        rong = []
+        for ten in self.dac_trung:
+            gia_tri = ca[ten]
+            try:
+                so = float(gia_tri)
+            except (TypeError, ValueError):
+                rong.append(TEN_TIENG_VIET.get(ten, ten))
+                continue
+            if so != so:  # NaN là giá trị duy nhất khác chính nó
+                rong.append(TEN_TIENG_VIET.get(ten, ten))
+        if rong:
+            raise ValueError(
+                f"Các thông tin sau đang để trống hoặc không phải số: "
+                f"{', '.join(rong)}. Hệ thống không đoán thay khi thiếu số đo — "
+                f"hãy đo lại rồi nhập đầy đủ."
+            )
+
         # --- LỚP 1: Quy tắc cảnh báo đỏ -------------------------------
         # Chạy TRƯỚC AI. Nếu trúng, kết luận CAO ngay và không cần hỏi AI.
         canh_bao_do = kiem_tra_canh_bao_do(ca)

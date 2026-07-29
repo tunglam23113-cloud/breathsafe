@@ -42,12 +42,24 @@ Mở trong tab trình duyệt bình thường. Micro vẫn hoạt động vì ch
 | `tao_du_lieu.py` | Sinh dữ liệu mô phỏng theo thang điểm nguy cơ | Vừa |
 | `he_thong.py` | **Ghép 3 lớp an toàn** lại với nhau | Vừa |
 | `huan_luyen.py` | Chia dữ liệu, train 5 mô hình, so sánh, đánh giá | Vừa |
-| `app.py` | Giao diện Streamlit 5 trang | Vừa |
+| `app.py` | Giao diện Streamlit 7 trang | Vừa |
 | `am_thanh.py` | Ghi âm + trích đặc trưng tiếng ho | Vừa |
 | `huan_luyen_tieng_ho.py` | **Train mô hình phân loại tiếng ho** (module riêng) | Vừa |
 | `chay_desktop.py` + `BreathSafe.bat` | Mở app như cửa sổ desktop | Vừa |
 | `retrain.py` | Huấn luyện lại từ phản hồi bác sĩ | Vừa |
 | `tieng_viet.py` | Giúp cửa sổ lệnh Windows in được tiếng Việt | Dễ |
+
+## Bảy trang của app
+
+| Trang | Việc nó làm |
+|---|---|
+| Sàng lọc | Nhập một ca → mức nguy cơ + lý do + khuyến nghị. Có nút **tải phiếu kết quả** ra file HTML, mở bằng trình duyệt rồi Ctrl+P là in được hoặc lưu thành PDF. |
+| Sàng lọc hàng loạt | Tải lên file CSV nhiều ca, chấm cả bộ một lượt, tải kết quả về. Nếu file có cột `expected` hoặc `risk_level` thì app tự chấm điểm và đếm **số ca Cao bị bỏ sót**. Đây là công cụ để làm mục "đối chứng với dataset công khai" trong checklist. |
+| Lịch sử ca | Mọi ca đã sàng lọc trong phiên, kèm biểu đồ phân bố mức nguy cơ và **tỉ lệ kết luận đến từ quy tắc so với từ AI**. Tải về CSV được. Chỉ nằm trong bộ nhớ — tắt app là mất, không có file bệnh nhân nào lưu lén trên máy. |
+| Phản hồi bác sĩ | Ghi lại ý kiến bất đồng của nhân viên y tế để `retrain.py` học lại. |
+| Ca lâm sàng | Bộ 20 ca kinh điển, kèm nút **chạy lại tại chỗ** bằng đúng mô hình app đang nạp. |
+| Về hệ thống | Ba lớp an toàn, bốn cơ chế, bảng so sánh mô hình, reliability diagram. |
+| Giới hạn | Những gì hệ thống không làm được — nêu thẳng. |
 
 ## Mô hình phân loại tiếng ho (module RIÊNG)
 
@@ -111,20 +123,28 @@ Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
 
 ## Kết quả (dữ liệu mô phỏng, tập test 300 ca)
 
+> Các con số dưới đây được chép từ `ket_qua_so_sanh.csv` và
+> `ket_qua_ca_kinh_dien_tong_hop.csv` — hai file do `python huan_luyen.py` sinh
+> ra. **Chạy lại lệnh đó thì phải cập nhật lại bảng này.** Bảng cũ từng lệch với
+> file kết quả thật, và một con số trong báo cáo mà không khớp file sinh ra nó
+> là thứ giám khảo phát hiện trong 30 giây.
+
 | Mô hình | Recall (Cao) | Bỏ sót (Cao) | F1 macro | ECE | Accuracy |
 |---|---:|---:|---:|---:|---:|
-| Chỉ Rule Engine | 0.833 | 0.167 | 0.715 | — | 0.710 |
-| Logistic Regression | 0.833 | 0.167 | 0.830 | 0.022 | 0.837 |
-| Decision Tree | 0.933 | 0.067 | 0.874 | 0.024 | 0.877 |
-| Chỉ AI (RF + hiệu chuẩn) | 0.917 | 0.083 | **0.915** | **0.020** | **0.917** |
-| **HỆ THỐNG ĐẦY ĐỦ** | **0.950** | **0.050** | 0.764 | — | 0.753 |
+| Chỉ Rule Engine | 0.850 | 0.150 | 0.747 | — | 0.750 |
+| Logistic Regression | 0.817 | 0.183 | 0.808 | 0.029 | 0.823 |
+| Decision Tree | 0.917 | 0.083 | 0.862 | 0.021 | 0.857 |
+| Chỉ AI (RF + hiệu chuẩn) | 0.917 | 0.083 | **0.903** | **0.017** | **0.903** |
+| **HỆ THỐNG ĐẦY ĐỦ** | **0.967** | **0.033** | 0.794 | — | 0.787 |
 
-**Bộ 20 ca kinh điển:** chỉ AI đạt 16/20 → hệ thống đầy đủ đạt **18/20** (vượt mục tiêu 17/20). Rule Engine bắt được 2 ca nhi khoa mà AI bỏ sót.
+**Bộ 20 ca kinh điển:** chỉ AI đạt 15/20 → hệ thống đầy đủ đạt **18/20** (vượt mục tiêu 17/20). Rule Engine bắt được 3 ca mà AI bỏ sót.
+
+Hai ca hệ thống vẫn bỏ sót là **TC16** (ngộ độc khí CO — máy đo SpO2 vẫn hiện 98%) và **TC18** (lao kê — sốt kéo dài 21 ngày nhưng dấu hiệu hô hấp nhẹ). Cả hai được phân tích trong phần Giới hạn.
 
 ### Hai câu giám khảo chắc chắn sẽ hỏi về bảng này
 
 **"Vì sao hệ thống đầy đủ có Accuracy THẤP HƠN chỉ dùng AI?"**
-Vì Rule Engine cố tình đẩy nhiều ca lên mức Cao. Nó đánh đổi: bắt được nhiều ca nguy hiểm hơn (Recall 0.917 → 0.950) nhưng báo động giả nhiều hơn (Accuracy 0.917 → 0.753). Đây là **lựa chọn có chủ ý**, không phải lỗi. Bỏ sót một ca viêm phổi nặng có thể khiến một người chết; một báo động giả chỉ tốn của nhân viên y tế vài phút xem lại. Đề tài tối ưu Recall, không tối ưu Accuracy.
+Vì Rule Engine cố tình đẩy nhiều ca lên mức Cao. Nó đánh đổi: bắt được nhiều ca nguy hiểm hơn (Recall 0.917 → 0.967) nhưng báo động giả nhiều hơn (Accuracy 0.903 → 0.787). Đây là **lựa chọn có chủ ý**, không phải lỗi. Bỏ sót một ca viêm phổi nặng có thể khiến một người chết; một báo động giả chỉ tốn của nhân viên y tế vài phút xem lại. Đề tài tối ưu Recall, không tối ưu Accuracy.
 
 **"Vì sao cột ECE của Rule Engine và hệ thống đầy đủ để trống?"**
 Vì hai mô hình đó không đưa ra xác suất. Khi Rule Engine kết luận "SpO2 = 88% kèm khó thở là nguy hiểm", đó là một quyết định y khoa dứt khoát, không phải con số xác suất — nên không có gì để hiệu chuẩn.

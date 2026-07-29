@@ -134,8 +134,11 @@ def main():
     )
     print(bang.to_string(index=False))
 
-    recall_cu = bang.loc[0, "Recall (Cao)"]
-    recall_moi = bang.loc[1, "Recall (Cao)"]
+    # Dùng .iloc (theo VỊ TRÍ) chứ không phải .loc (theo NHÃN chỉ mục): nếu
+    # compare_models đổi cách đánh chỉ mục, .loc[0] sẽ ném KeyError hoặc — tệ
+    # hơn — trả về đúng một hàng khác mà không báo gì.
+    recall_cu = bang.iloc[0]["Recall (Cao)"]
+    recall_moi = bang.iloc[1]["Recall (Cao)"]
 
     print()
     if recall_moi > recall_cu:

@@ -59,18 +59,63 @@ def ghi_am(giay: int = 5, tan_so: int = TAN_SO_MAU):
     return am.reshape(-1), tan_so
 
 
-def doc_file(du_lieu_bytes: bytes):
-    """Đọc một file âm thanh đã tải lên (.wav, .mp3, .ogg...).
+def doc_file(du_lieu_bytes: bytes, ten_file: str = ""):
+    """Đọc một file âm thanh đã tải lên (.wav, .flac, .ogg, .mp3, .m4a...).
 
     Trả về (mảng biên độ, tần số). File 2 kênh (stereo) được gộp thành 1 kênh
     (mono) để đồng nhất với dữ liệu ghi từ micro.
-    """
-    import soundfile as sf
 
-    y, sr = sf.read(io.BytesIO(du_lieu_bytes), dtype="float32")
-    if y.ndim > 1:
-        y = y.mean(axis=1)
-    return y, int(sr)
+    Vì sao phải thử HAI thư viện?
+    -----------------------------
+    `soundfile` (thư viện libsndfile) đọc rất tốt .wav / .flac / .ogg và từ bản
+    0.12 thì đọc được cả .mp3 — nhưng nó KHÔNG đọc được .m4a/AAC. App lại cho
+    chọn .m4a trong ô tải file (điện thoại iPhone ghi âm ra đúng đuôi này), nên
+    bản trước gặp file .m4a là báo "Không đọc được file âm thanh này" kèm một
+    dòng lỗi khó hiểu của thư viện, mà không nói người dùng phải làm gì.
+
+    Ở đây thử `soundfile` trước (nhanh, không cần cài gì thêm); nếu không được
+    thì lui về `librosa` (gọi ffmpeg ở dưới, đọc được gần như mọi định dạng).
+    Nếu cả hai đều thua thì báo một câu tiếng Việt nói rõ cách khắc phục.
+    """
+    try:
+        import soundfile as sf
+
+        y, sr = sf.read(io.BytesIO(du_lieu_bytes), dtype="float32")
+        if y.ndim > 1:
+            y = y.mean(axis=1)
+        return y, int(sr)
+    except Exception as loi:
+        # Phải gán ra một tên khác: Python XOÁ biến của `except ... as loi` ngay
+        # khi ra khỏi khối except, nên dùng lại `loi` ở dưới sẽ là NameError.
+        loi_soundfile = loi
+
+    # Đường lui: librosa + ffmpeg. librosa cần một file thật trên đĩa cho các
+    # định dạng phải giải mã bằng ffmpeg, nên ghi ra file tạm rồi xoá.
+    import tempfile
+    from pathlib import Path
+
+    duoi = Path(ten_file).suffix or ".bin"
+    tep_tam = None
+    try:
+        import librosa
+
+        with tempfile.NamedTemporaryFile(suffix=duoi, delete=False) as f:
+            f.write(du_lieu_bytes)
+            tep_tam = f.name
+        y, sr = librosa.load(tep_tam, sr=None, mono=True)
+        return np.asarray(y, dtype="float32"), int(sr)
+    except Exception as loi_librosa:
+        raise ValueError(
+            f"không giải mã được định dạng này ({duoi or 'không rõ đuôi'}). "
+            f"Hãy đổi sang .wav, hoặc cài ffmpeg rồi thử lại "
+            f"(winget install Gyan.FFmpeg). Chi tiết: {loi_soundfile} / {loi_librosa}"
+        ) from loi_librosa
+    finally:
+        if tep_tam:
+            try:
+                Path(tep_tam).unlink()
+            except OSError:
+                pass
 
 
 def trich_dac_trung(y, sr) -> dict:

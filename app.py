@@ -9,6 +9,7 @@ Thiết kế hướng đến người dùng thật ở trạm y tế xã:
   - Mỗi kết quả đều có lý do, không bao giờ chỉ hiện một con số
 """
 
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -17,13 +18,28 @@ import streamlit as st
 from health_core import PhysicianFeedbackLoop
 
 import am_thanh
-from ca_kinh_dien import BS_DA_KY, CA_KINH_DIEN, TEN_BAC_SI_DUYET
-from dac_trung import DAC_TRUNG
+from ca_kinh_dien import (
+    BS_DA_KY,
+    CA_KINH_DIEN,
+    NGAY_DUYET,
+    TEN_BAC_SI_DUYET,
+    da_duyet_hop_le,
+)
+from dac_trung import DAC_TRUNG, MUC_NGUY_CO, TEN_TIENG_VIET
 from he_thong import HeThongBreathSafe
 from quy_tac import nguong_tho_nhanh_nguy_hiem, nhip_tho_binh_thuong
 
-FILE_MO_HINH = "mo_hinh_breathsafe.joblib"
-FILE_PHAN_HOI = "phan_hoi_bac_si.json"
+# Mọi đường dẫn phải neo vào THƯ MỤC CHỨA FILE NÀY, không phải thư mục hiện
+# hành. Trước đây dùng đường dẫn tương đối trần, nên chạy `streamlit run
+# D:\...\app.py` từ một thư mục khác là app báo "chưa có mô hình" dù file
+# .joblib nằm ngay cạnh app.py.
+THU_MUC = Path(__file__).resolve().parent
+FILE_MO_HINH = THU_MUC / "mo_hinh_breathsafe.joblib"
+FILE_PHAN_HOI = THU_MUC / "phan_hoi_bac_si.json"
+
+# Bộ ca chỉ được coi là đã duyệt khi cờ BS_DA_KY bật VÀ tên bác sĩ là tên thật
+# (xem da_duyet_hop_le trong ca_kinh_dien.py).
+DA_DUYET = da_duyet_hop_le()
 
 st.set_page_config(
     page_title="BreathSafe — Sàng lọc nguy cơ hô hấp",
@@ -237,22 +253,33 @@ st.markdown(
 
 
 def the_chi_so(gia_tri, nguong_xau, nguong_vua, dao_nguoc=False):
-    """Trả về (màu, nhãn) cho một chỉ số sinh tồn, để hiện ngay lúc nhập.
+    """Trả về (màu chữ, màu nền, nhãn) cho một chỉ số sinh tồn.
 
-    Người dùng thấy ngay "SpO2 89% — Thấp" ngay khi kéo thanh trượt, không cần
-    chờ bấm nút. Đây là thứ giúp nhân viên y tế tin vào công cụ: nó phản ứng
+    Người dùng thấy ngay "SpO2 89% — Bất thường" ngay khi kéo thanh trượt, không
+    cần chờ bấm nút. Đây là thứ giúp nhân viên y tế tin vào công cụ: nó phản ứng
     tức thì và đồng ý với những gì họ đã biết.
+
+    Hai ngưỡng truyền vào phải là ĐÚNG ngưỡng trong quy_tac.py, và phép so sánh
+    ở đây là so sánh NGẶT (`>` / `<`) để khớp chính xác với bộ quy tắc:
+
+        quy tắc nói "nhiệt độ > 39"  →  39.0 độ KHÔNG trúng quy tắc
+        nên thẻ chỉ số cũng không được tô đỏ ở đúng 39.0 độ
+
+    Bản trước dùng `>=` / `<=` rồi bù lại bằng cách cộng 1 vào ngưỡng nhịp thở
+    (`nguong_rr_xau + 1`). Cách đó đúng với số nguyên nhưng SAI với nhiệt độ:
+    một ca 39.0°C hiện chữ đỏ "Bất thường" trong khi hệ thống lại kết luận nguy
+    cơ Thấp — người dùng thấy hai thứ mâu thuẫn nhau ngay trên cùng màn hình.
 
     Tham số:
         dao_nguoc: True nếu GIÁ TRỊ CÀNG CAO CÀNG XẤU (nhịp thở, nhiệt độ).
                    False nếu càng THẤP càng xấu (SpO2).
     """
     if dao_nguoc:
-        xau = gia_tri >= nguong_xau
-        vua = gia_tri >= nguong_vua
+        xau = gia_tri > nguong_xau
+        vua = gia_tri > nguong_vua
     else:
-        xau = gia_tri <= nguong_xau
-        vua = gia_tri <= nguong_vua
+        xau = gia_tri < nguong_xau
+        vua = gia_tri < nguong_vua
 
     if xau:
         return "#DC2626", "#FEF2F2", "Bất thường"
@@ -261,14 +288,190 @@ def the_chi_so(gia_tri, nguong_xau, nguong_vua, dao_nguoc=False):
     return "#16A34A", "#F0FDF4", "Bình thường"
 
 
+def cac_chi_so_sinh_ton(ca):
+    """Danh sách (nhãn, giá trị, đơn vị, màu chữ, màu nền, trạng thái) của 3 chỉ số.
+
+    Gom vào một chỗ vì trang Sàng lọc, phiếu in và trang Lịch sử đều cần đúng
+    cách tô màu này — tách ra thì sớm muộn ba chỗ cũng lệch nhau.
+    """
+    bo_nguong = [
+        # SpO2: quy tắc cảnh báo đỏ dùng < 92, dấu hiệu đáng ngờ dùng < 95.
+        ("SpO2", ca["spo2"], "%", 92, 95, False),
+        # Nhịp thở: ngưỡng báo động và ngưỡng "hơi nhanh", cả hai theo tuổi.
+        ("Nhịp thở", ca["respiratory_rate"], " l/p",
+         nguong_tho_nhanh_nguy_hiem(ca["age"]),
+         nhip_tho_binh_thuong(ca["age"]) + 6, True),
+        # Nhiệt độ: quy tắc dùng > 39, dấu hiệu đáng ngờ dùng > 38.5.
+        ("Nhiệt độ", ca["temperature"], "°C", 39.0, 38.5, True),
+    ]
+    ket_qua = []
+    for nhan, gt, don_vi, nguong_xau, nguong_vua, dao_nguoc in bo_nguong:
+        chinh, nen, trang_thai = the_chi_so(gt, nguong_xau, nguong_vua, dao_nguoc)
+        ket_qua.append((nhan, gt, don_vi, chinh, nen, trang_thai))
+    return ket_qua
+
+
+# ---------------------------------------------------------------------------
+# LỜI KHUYẾN NGHỊ THEO MỨC — một nguồn duy nhất
+# ---------------------------------------------------------------------------
+# Trang Sàng lọc, phiếu in và bản cho gia đình đều đọc từ đây. Trước đây mấy
+# đoạn chữ này nằm rải trong thân trang, nên sửa lời khuyên ở một chỗ là chỗ
+# kia nói khác đi mà không ai để ý.
+
+KHUYEN_NGHI_NVYT = {
+    2: [
+        "<b>Cần nhân viên y tế kiểm tra NGAY</b>",
+        "Cân nhắc hội chẩn hoặc chuyển tuyến",
+        "Không tự ý dùng thuốc",
+    ],
+    1: [
+        "Nên được nhân viên y tế khám <b>trong hôm nay</b>",
+        "Theo dõi sát; nếu nặng lên phải đi khám ngay",
+    ],
+    0: [
+        "Theo dõi tại nhà, nghỉ ngơi, uống đủ nước",
+        "Nếu xuất hiện khó thở hoặc sốt cao kéo dài, đi khám ngay",
+    ],
+}
+
+LOI_GIA_DINH = {
+    2: "Hiện tại người bệnh <b>có dấu hiệu nguy hiểm</b>. Anh/chị nên đưa người "
+       "bệnh đến bệnh viện huyện <b>ngay hôm nay</b>.",
+    1: "Người bệnh <b>cần được nhân viên y tế xem</b>. Anh/chị nên đưa đến trạm "
+       "y tế trong hôm nay để kiểm tra cho chắc.",
+    0: "Hiện tại <b>chưa thấy dấu hiệu nguy hiểm</b>. Anh/chị cho người bệnh nghỉ "
+       "ngơi, uống nhiều nước. Nếu thấy <b>khó thở</b> hoặc <b>sốt cao không "
+       "giảm</b>, hãy đưa đi khám ngay.",
+}
+
+MIEN_TRU = (
+    "BreathSafe KHÔNG phải thiết bị y tế. Kết quả chỉ hỗ trợ sàng lọc, không "
+    "chẩn đoán, không kê đơn, không thay thế quyết định của nhân viên y tế."
+)
+
+
+def ghi_lich_su(ca, ket_qua):
+    """Lưu một ca vừa sàng lọc vào lịch sử của PHIÊN làm việc hiện tại.
+
+    Vì sao chỉ lưu trong phiên, không ghi ra đĩa?
+    ---------------------------------------------
+    Vì đây là dữ liệu sức khoẻ. Phần đạo đức dữ liệu của đề tài nói rõ: không
+    thu thập thông tin định danh, dữ liệu không rời khỏi máy. Giữ trong bộ nhớ
+    và để người dùng CHỦ ĐỘNG bấm tải CSV nếu cần là lựa chọn an toàn hơn — tắt
+    app là mọi thứ biến mất, không có file nào nằm lại trên máy mà người dùng
+    không biết.
+    """
+    lich_su = st.session_state.setdefault("lich_su", [])
+    lich_su.append(
+        {
+            "Thời điểm": datetime.now().strftime("%H:%M:%S %d/%m/%Y"),
+            **{TEN_TIENG_VIET.get(k, k): ca[k] for k in DAC_TRUNG},
+            "Mức nguy cơ": ket_qua.ten_muc,
+            "Nguồn kết luận": {
+                "quy_tac": "Quy tắc y khoa",
+                "hau_kiem": "Hậu kiểm nâng mức",
+                "ai": "AI",
+            }.get(ket_qua.nguon, ket_qua.nguon),
+            "Độ tin cậy": round(float(ket_qua.do_tin_cay), 4),
+            "Ca lạ (OOD)": "Có" if ket_qua.la_ca_la else "Không",
+            "Lý do": " | ".join(ket_qua.ly_do),
+        }
+    )
+
+
+def phieu_html(ca, ket_qua):
+    """Dựng phiếu kết quả một ca thành HTML tự chứa, in ra giấy được.
+
+    Vì sao là HTML mà không phải PDF?
+    ---------------------------------
+    Xuất PDF cần thêm thư viện (reportlab/weasyprint) và font tiếng Việt riêng —
+    thêm một thứ có thể hỏng ngay hôm trình bày. File HTML mở bằng bất kỳ trình
+    duyệt nào rồi Ctrl+P là ra PDF hoặc ra giấy, không cần cài gì.
+
+    Phiếu CỐ TÌNH in cả dòng miễn trừ và cả nguồn kết luận (quy tắc / AI). Một
+    tờ giấy rời khỏi màn hình sẽ được người khác đọc mà không có ngữ cảnh, nên
+    những cảnh báo đó phải đi kèm nó.
+    """
+    m = MAU[ket_qua.muc]
+    hang_chi_so = "".join(
+        f"<tr><td>{nhan}</td>"
+        f"<td style='text-align:right;font-weight:700;color:{chinh}'>{gt}{don_vi}</td>"
+        f"<td style='color:{chinh}'>{trang_thai}</td></tr>"
+        for nhan, gt, don_vi, chinh, nen, trang_thai in cac_chi_so_sinh_ton(ca)
+    )
+    hang_dau_vao = "".join(
+        f"<tr><td>{TEN_TIENG_VIET.get(k, k)}</td>"
+        f"<td style='text-align:right'>{ca[k]}</td></tr>"
+        for k in DAC_TRUNG
+    )
+    ly_do = "".join(f"<li>{x}</li>" for x in ket_qua.ly_do)
+    khuyen_nghi = "".join(f"<li>{x}</li>" for x in KHUYEN_NGHI_NVYT[ket_qua.muc])
+    nguon = {
+        "quy_tac": "Quy tắc y khoa (không dùng AI cho ca này)",
+        "hau_kiem": "Lớp hậu kiểm nâng mức (AI ban đầu đánh giá thấp hơn)",
+        "ai": f"Mô hình AI · độ tin cậy {ket_qua.do_tin_cay:.0%} (đã hiệu chuẩn)",
+    }.get(ket_qua.nguon, ket_qua.nguon)
+    canh_bao_ood = (
+        f"<p class='canhbao'><b>CẢNH BÁO CA LẠ:</b> {ket_qua.ood.message}</p>"
+        if ket_qua.la_ca_la
+        else ""
+    )
+    canh_bao_ky = (
+        ""
+        if DA_DUYET
+        else "<p class='canhbao'><b>BẢN NGHIÊN CỨU:</b> bộ quy tắc và bộ ca lâm "
+             "sàng của hệ thống CHƯA được bác sĩ ký duyệt. Phiếu này không có "
+             "giá trị chuyên môn.</p>"
+    )
+
+    return f"""<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<title>Phiếu sàng lọc BreathSafe</title>
+<style>
+  body {{ font-family: "Segoe UI", Arial, sans-serif; color:#0F172A;
+         max-width: 760px; margin: 24px auto; padding: 0 16px; line-height:1.55; }}
+  h1 {{ font-size: 20px; margin: 0; }}
+  .phu {{ color:#64748B; font-size: 13px; margin: 2px 0 18px 0; }}
+  .muc {{ border:2px solid {m['vien']}; background:{m['nen']}; color:{m['chinh']};
+          border-radius:10px; padding:14px 18px; font-size:22px; font-weight:700; }}
+  .muc small {{ display:block; font-size:13px; font-weight:500; opacity:.85;
+                margin-top:4px; }}
+  h2 {{ font-size: 14px; text-transform: uppercase; letter-spacing:.05em;
+        color:#0F766E; margin: 22px 0 6px 0; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: 14px; }}
+  td {{ border-bottom: 1px solid #E2E8F0; padding: 5px 8px; }}
+  ul {{ margin: 6px 0; padding-left: 20px; font-size: 14px; }}
+  .canhbao {{ background:#FEF2F2; border-left:4px solid #DC2626; padding:9px 12px;
+              font-size:13px; border-radius:0 6px 6px 0; }}
+  .mientru {{ margin-top: 26px; padding-top: 10px; border-top:1px solid #CBD5E1;
+              color:#475569; font-size: 12px; }}
+  .kyten {{ margin-top: 26px; font-size: 13px; }}
+  @media print {{ body {{ margin: 0; }} }}
+</style></head><body>
+<h1>PHIẾU SÀNG LỌC NGUY CƠ HÔ HẤP — BreathSafe</h1>
+<p class="phu">Lập lúc {datetime.now().strftime("%H:%M ngày %d/%m/%Y")}
+ · Không ghi tên, địa chỉ hay bất kỳ thông tin định danh nào của người bệnh.</p>
+{canh_bao_ky}{canh_bao_ood}
+<div class="muc">Nguy cơ {ket_qua.ten_muc.upper()}<small>Nguồn kết luận: {nguon}</small></div>
+<h2>Chỉ số sinh tồn</h2><table>{hang_chi_so}</table>
+<h2>Vì sao hệ thống kết luận như vậy</h2><ul>{ly_do}</ul>
+<h2>Khuyến nghị cho nhân viên y tế</h2><ul>{khuyen_nghi}</ul>
+<h2>Lời dặn cho gia đình</h2><p style="font-size:15px">{LOI_GIA_DINH[ket_qua.muc]}</p>
+<h2>Toàn bộ thông tin đã nhập</h2><table>{hang_dau_vao}</table>
+<div class="kyten">Nhân viên y tế xem lại và ký:
+ ..................................................</div>
+<p class="mientru">{MIEN_TRU}</p>
+</body></html>"""
+
+
 @st.cache_resource
 def nap_he_thong():
     """Nạp mô hình một lần rồi giữ trong bộ nhớ (cache) cho nhanh."""
     from health_core import RiskScreeningModel
 
-    if not Path(FILE_MO_HINH).exists():
+    if not FILE_MO_HINH.exists():
         return None
-    return HeThongBreathSafe(RiskScreeningModel.load(FILE_MO_HINH))
+    return HeThongBreathSafe(RiskScreeningModel.load(str(FILE_MO_HINH)))
 
 
 @st.cache_resource
@@ -280,7 +483,7 @@ def nap_mo_hinh_ho():
     """
     import joblib
 
-    duong_dan = Path("mo_hinh_tieng_ho.joblib")
+    duong_dan = THU_MUC / "mo_hinh_tieng_ho.joblib"
     return joblib.load(duong_dan) if duong_dan.exists() else None
 
 
@@ -337,18 +540,19 @@ def khoi_ghi_am_ho():
         with c_am_2:
             tep_ho = st.file_uploader(
                 "Hoặc tải lên file tiếng ho",
-                type=["wav", "mp3", "m4a", "ogg"],
-                help="Chỉ dùng mẫu đã có sự đồng ý của người được ghi âm.",
+                type=["wav", "mp3", "ogg", "flac", "m4a"],
+                help="Chỉ dùng mẫu đã có sự đồng ý của người được ghi âm. "
+                     "Định dạng chắc chắn đọc được: .wav, .flac, .ogg, .mp3. "
+                     "File .m4a cần cài thêm ffmpeg.",
                 key="ho_tai_file",
             )
             if tep_ho is not None:
                 try:
-                    y_ho, sr_ho = am_thanh.doc_file(tep_ho.getvalue())
+                    y_ho, sr_ho = am_thanh.doc_file(tep_ho.getvalue(), tep_ho.name)
                     st.session_state["ho_y"] = y_ho
                     st.session_state["ho_sr"] = sr_ho
                 except Exception as loi:
-                    st.error("Không đọc được file âm thanh này.")
-                    st.caption(str(loi))
+                    st.error(f"Không đọc được file âm thanh này: {loi}")
 
         if "ho_y" in st.session_state:
             y_ho = st.session_state["ho_y"]
@@ -409,6 +613,14 @@ def khoi_ghi_am_ho():
                 "Phân loại tiếng ho là module riêng, CHƯA đưa vào quyết định."
             )
 
+            # Không có nút này thì đoạn ghi đầu tiên dính lại suốt phiên làm
+            # việc: sang bệnh nhân thứ hai, màn hình vẫn hiện tiếng ho của
+            # người trước — vừa gây nhầm lẫn vừa là vấn đề riêng tư.
+            if st.button("Xoá bản ghi này", key="ho_nut_xoa"):
+                for khoa in ("ho_y", "ho_sr"):
+                    st.session_state.pop(khoa, None)
+                st.rerun(scope="fragment")
+
 
 if he_thong is None:
     st.error(
@@ -434,14 +646,20 @@ with st.sidebar:
         "Điều hướng",
         [
             "1. Sàng lọc",
-            "2. Phản hồi bác sĩ",
-            "3. Ca lâm sàng",
-            "4. Về hệ thống",
-            "5. Giới hạn",
+            "2. Sàng lọc hàng loạt",
+            "3. Lịch sử ca",
+            "4. Phản hồi bác sĩ",
+            "5. Ca lâm sàng",
+            "6. Về hệ thống",
+            "7. Giới hạn",
         ],
         format_func=lambda s: s.split(". ", 1)[1],
         label_visibility="collapsed",
     )
+    # Tách phần tên ra để phía dưới điều hướng bằng TÊN chứ không bằng số thứ
+    # tự. Bản trước so bằng trang.startswith("2") — chèn thêm một trang vào
+    # giữa là mọi nhánh phía sau trỏ nhầm trang mà không có lỗi nào báo ra.
+    ten_trang = trang.split(". ", 1)[1]
 
     st.write("")
     # Dùng HTML tự vẽ thay cho st.warning/st.error: hai cái đó có nền sáng, đặt
@@ -454,7 +672,13 @@ with st.sidebar:
         "không kê đơn, không thay thế bác sĩ.</div>",
         unsafe_allow_html=True,
     )
-    if not BS_DA_KY:
+    if not DA_DUYET:
+        # Dùng DA_DUYET chứ không phải BS_DA_KY: nếu ai đó bật cờ nhưng để
+        # nguyên tên ví dụ ("Nguyễn Văn A"), cảnh báo này vẫn phải hiện ra.
+        them = ""
+        if BS_DA_KY:
+            them = ("<br><b>Chú ý:</b> cờ BS_DA_KY đang bật nhưng tên bác sĩ "
+                    "trông như tên ví dụ, nên hệ thống vẫn coi là chưa ký.")
         st.markdown(
             '<div style="background:rgba(220,38,38,0.16);'
             "border:1px solid rgba(248,113,113,0.4);border-radius:8px;"
@@ -462,7 +686,7 @@ with st.sidebar:
             'margin-top:0.6rem;">'
             "<b>Chưa có xác nhận chuyên môn.</b><br>Bộ quy tắc và 20 ca kinh điển "
             "chưa được bác sĩ ký duyệt. Bản nghiên cứu, chưa dùng với bệnh nhân "
-            "thật.</div>",
+            f"thật.{them}</div>",
             unsafe_allow_html=True,
         )
 
@@ -471,7 +695,7 @@ with st.sidebar:
 # TRANG 1 — SÀNG LỌC
 # ---------------------------------------------------------------------------
 
-if trang.startswith("1"):
+if ten_trang == "Sàng lọc":
     st.title("Sàng lọc nguy cơ bệnh hô hấp")
     st.caption(
         "Nhập thông tin bệnh nhân, hệ thống gợi ý mức nguy cơ và giải thích lý do. "
@@ -529,8 +753,12 @@ if trang.startswith("1"):
                 )
                 st.caption("Người lớn 12–20. Trẻ nhỏ thở nhanh hơn là bình thường.")
 
+                # format="%.1f": nhiệt kế y tế đọc tới 1 chữ số thập phân. Bỏ
+                # tham số này thì Streamlit hiện "37.00" — trông như máy đo hai
+                # số lẻ, một độ chính xác mà thiết bị ở trạm xã không có.
                 temperature = st.slider(
-                    "Nhiệt độ (°C)", 35.0, 42.0, float(gia_tri("temperature", 37.0)), 0.1
+                    "Nhiệt độ (°C)", 35.0, 42.0,
+                    float(gia_tri("temperature", 37.0)), 0.1, format="%.1f",
                 )
                 st.caption("Sốt khi > 37.5°C. Trên 39°C là sốt cao.")
 
@@ -563,10 +791,22 @@ if trang.startswith("1"):
             "days_sick": days_sick,
             "comorbidity": int(comorbidity),
         }
-        ket_qua = he_thong.danh_gia(ca)
+        # Bọc try/except: một ca nhập sai (hoặc mô hình hỏng) không được phép
+        # ném cả trang traceback Python vào mặt nhân viên y tế đang có bệnh
+        # nhân ngồi trước mặt.
+        try:
+            ket_qua = he_thong.danh_gia(ca)
+        except Exception as loi:
+            st.error(f"Không sàng lọc được ca này: {loi}")
+            st.caption(
+                "Nếu lỗi lặp lại, hãy chạy lại `python huan_luyen.py` để sinh "
+                "lại mô hình, rồi khởi động lại app."
+            )
+            st.stop()
+
         st.session_state["ca"] = ca
         st.session_state["ket_qua"] = ket_qua
-        st.session_state["co_am_thanh_ho"] = "ho_y" in st.session_state
+        ghi_lich_su(ca, ket_qua)
 
     if "ket_qua" in st.session_state:
         ket_qua = st.session_state["ket_qua"]
@@ -632,20 +872,10 @@ if trang.startswith("1"):
             st.markdown("### Chỉ số đã nhập")
 
             # Hiện lại các chỉ số kèm màu, để người dùng đối chiếu nhanh
-            # mà không phải cuộn ngược lên form.
-            # Ngưỡng nhịp thở phải theo TUỔI, giống hệt bộ quy tắc — nếu không,
-            # một bé 2 tuổi thở 30 lần/phút (hoàn toàn bình thường) sẽ hiện chữ
-            # đỏ "Bất thường" trong khi hệ thống lại kết luận nguy cơ Thấp.
-            nguong_rr_xau = nguong_tho_nhanh_nguy_hiem(ca["age"])
-            nguong_rr_vua = nhip_tho_binh_thuong(ca["age"]) + 6
-
-            for nhan, gt, don_vi, args in [
-                ("SpO2", ca["spo2"], "%", (91, 94, False)),
-                ("Nhịp thở", ca["respiratory_rate"], "l/p",
-                 (nguong_rr_xau + 1, nguong_rr_vua + 1, True)),
-                ("Nhiệt độ", ca["temperature"], "°C", (39.0, 38.5, True)),
-            ]:
-                chinh, nen, trang_thai = the_chi_so(gt, args[0], args[1], args[2])
+            # mà không phải cuộn ngược lên form. Ngưỡng lấy từ cac_chi_so_sinh_ton
+            # — cùng một nguồn với bộ quy tắc, nên màu trên thẻ không bao giờ
+            # mâu thuẫn với kết luận bên trên.
+            for nhan, gt, don_vi, chinh, nen, trang_thai in cac_chi_so_sinh_ton(ca):
                 st.markdown(
                     f"""<div style="display:flex;justify-content:space-between;
                     align-items:center;padding:0.5rem 0.75rem;background:{nen};
@@ -679,22 +909,7 @@ if trang.startswith("1"):
                 # **…** hiện nguyên hai dấu sao trên màn hình. Chỗ hỏng nặng nhất
                 # là dòng mức CAO: người dùng đọc thấy "**Cần nhân viên y tế
                 # kiểm tra NGAY**" thay vì chữ in đậm.
-                khuyen_nghi = {
-                    2: [
-                        "<b>Cần nhân viên y tế kiểm tra NGAY</b>",
-                        "Cân nhắc hội chẩn hoặc chuyển tuyến",
-                        "Không tự ý dùng thuốc",
-                    ],
-                    1: [
-                        "Nên được nhân viên y tế khám <b>trong hôm nay</b>",
-                        "Theo dõi sát; nếu nặng lên phải đi khám ngay",
-                    ],
-                    0: [
-                        "Theo dõi tại nhà, nghỉ ngơi, uống đủ nước",
-                        "Nếu xuất hiện khó thở hoặc sốt cao kéo dài, đi khám ngay",
-                    ],
-                }[ket_qua.muc]
-                for x in khuyen_nghi:
+                for x in KHUYEN_NGHI_NVYT[ket_qua.muc]:
                     st.markdown(
                         f'<div style="border-left:3px solid {m["chinh"]};'
                         f'padding:0.35rem 0 0.35rem 0.7rem;margin-bottom:0.35rem;">'
@@ -708,21 +923,25 @@ if trang.startswith("1"):
                 st.caption("Lời dặn bằng câu đơn giản, để đọc cho người nhà nghe.")
                 # Cũng phải dùng <b> vì lý do y hệt khối khuyến nghị ở trên: đoạn
                 # này nằm trong <div> HTML thô nên **…** không được dịch.
-                loi_gia_dinh = {
-                    2: "Hiện tại người bệnh <b>có dấu hiệu nguy hiểm</b>. Anh/chị nên "
-                       "đưa người bệnh đến bệnh viện huyện <b>ngay hôm nay</b>.",
-                    1: "Người bệnh <b>cần được nhân viên y tế xem</b>. Anh/chị nên đưa "
-                       "đến trạm y tế trong hôm nay để kiểm tra cho chắc.",
-                    0: "Hiện tại <b>chưa thấy dấu hiệu nguy hiểm</b>. Anh/chị cho người "
-                       "bệnh nghỉ ngơi, uống nhiều nước. Nếu thấy <b>khó thở</b> hoặc "
-                       "<b>sốt cao không giảm</b>, hãy đưa đi khám ngay.",
-                }[ket_qua.muc]
                 st.markdown(
                     f'<div style="background:{m["nen"]};border-radius:10px;'
                     f'padding:1rem;font-size:18px;line-height:1.6;">'
-                    f"{loi_gia_dinh}</div>",
+                    f"{LOI_GIA_DINH[ket_qua.muc]}</div>",
                     unsafe_allow_html=True,
                 )
+
+        st.write("")
+        st.download_button(
+            "⬇  Tải phiếu kết quả (mở bằng trình duyệt rồi Ctrl+P để in)",
+            data=phieu_html(ca, ket_qua).encode("utf-8"),
+            file_name=f"phieu_breathsafe_{datetime.now():%Y%m%d_%H%M%S}.html",
+            mime="text/html",
+            use_container_width=True,
+        )
+        st.caption(
+            "Phiếu KHÔNG chứa tên, địa chỉ hay thông tin định danh — chỉ có các "
+            "chỉ số đã nhập, kết luận và lý do."
+        )
 
         st.caption(
             "Hệ thống chỉ hỗ trợ sàng lọc, không thay thế chẩn đoán của bác sĩ."
@@ -730,10 +949,212 @@ if trang.startswith("1"):
 
 
 # ---------------------------------------------------------------------------
-# TRANG 2 — PHẢN HỒI BÁC SĨ
+# TRANG 2 — SÀNG LỌC HÀNG LOẠT TỪ FILE CSV
+# ---------------------------------------------------------------------------
+# Vì sao cần trang này? Vì checklist "trước khi đem đi thi" có một mục là đối
+# chứng với ít nhất một dataset công khai. Không có trang này thì cách duy nhất
+# để chấm một bộ dữ liệu ngoài là viết thêm script Python — ngoài tầm của người
+# dùng thật (nhân viên y tế), và bất tiện ngay cả với người làm đề tài.
+
+elif ten_trang == "Sàng lọc hàng loạt":
+    st.title("Sàng lọc nhiều ca từ file CSV")
+    st.caption(
+        "Dùng để đối chứng hệ thống với một bộ dữ liệu bên ngoài, hoặc chấm lại "
+        "nhiều ca cùng lúc. Toàn bộ xử lý chạy trên máy này, không gửi đi đâu."
+    )
+
+    with st.expander("File CSV cần có những cột nào?", expanded=True):
+        st.write(
+            "Bắt buộc đủ **11 cột** dưới đây (đúng tên tiếng Anh, không phân biệt "
+            "thứ tự). Nếu có thêm cột `risk_level` (0/1/2) hoặc `expected` "
+            "(Thấp/Trung bình/Cao) thì hệ thống sẽ tự chấm điểm luôn."
+        )
+        st.code(",".join(DAC_TRUNG), language=None)
+        mau = pd.DataFrame([c["input"] for c in CA_KINH_DIEN[:3]])[DAC_TRUNG]
+        st.download_button(
+            "Tải file CSV mẫu",
+            data=mau.to_csv(index=False).encode("utf-8-sig"),
+            file_name="mau_sang_loc_hang_loat.csv",
+            mime="text/csv",
+        )
+
+    tep = st.file_uploader("Chọn file CSV", type=["csv"], key="hangloat_file")
+
+    if tep is not None:
+        try:
+            df_vao = pd.read_csv(tep)
+        except Exception as loi:
+            st.error(f"Không đọc được file CSV: {loi}")
+            st.stop()
+
+        thieu = [c for c in DAC_TRUNG if c not in df_vao.columns]
+        if thieu:
+            st.error(
+                "File thiếu các cột bắt buộc: **" + ", ".join(thieu) + "**. "
+                "Xem lại danh sách cột ở trên."
+            )
+            st.stop()
+
+        st.success(f"Đã đọc {len(df_vao)} ca. Đang sàng lọc…")
+
+        ket_qua_dong = []
+        thanh_tien_do = st.progress(0.0)
+        for vi_tri, (_, dong) in enumerate(df_vao.iterrows(), start=1):
+            ca_i = {k: dong[k] for k in DAC_TRUNG}
+            try:
+                kq = he_thong.danh_gia(ca_i)
+                ket_qua_dong.append(
+                    {
+                        "Dòng": vi_tri,
+                        "Mức nguy cơ": kq.ten_muc,
+                        "Nguồn": kq.nguon,
+                        "Độ tin cậy": round(float(kq.do_tin_cay), 3),
+                        "Ca lạ": "Có" if kq.la_ca_la else "Không",
+                        "Lý do": " | ".join(kq.ly_do),
+                    }
+                )
+            except Exception as loi:
+                # Một dòng hỏng không được làm chết cả file. Ghi lỗi vào đúng
+                # dòng đó rồi đi tiếp — với file vài nghìn ca, dừng ở dòng đầu
+                # tiên bị lỗi là cách chắc chắn nhất để không ai dùng nổi.
+                ket_qua_dong.append(
+                    {"Dòng": vi_tri, "Mức nguy cơ": "LỖI", "Nguồn": "—",
+                     "Độ tin cậy": None, "Ca lạ": "—", "Lý do": str(loi)}
+                )
+            thanh_tien_do.progress(vi_tri / len(df_vao))
+        thanh_tien_do.empty()
+
+        df_ra = pd.concat(
+            [df_vao.reset_index(drop=True), pd.DataFrame(ket_qua_dong).drop(columns=["Dòng"])],
+            axis=1,
+        )
+
+        so_loi = int((df_ra["Mức nguy cơ"] == "LỖI").sum())
+        df_ok = df_ra[df_ra["Mức nguy cơ"] != "LỖI"]
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Tổng số ca", len(df_ra))
+        c2.metric("Nguy cơ Cao", int((df_ok["Mức nguy cơ"] == "Cao").sum()))
+        c3.metric("Ca lạ (OOD)", int((df_ok["Ca lạ"] == "Có").sum()))
+        c4.metric("Dòng lỗi", so_loi)
+        if so_loi:
+            st.warning(
+                f"{so_loi} dòng không sàng lọc được (giá trị thiếu hoặc sai kiểu). "
+                "Xem cột 'Lý do' để biết chi tiết."
+            )
+
+        # --- Chấm điểm nếu file có sẵn đáp án -------------------------------
+        cot_dap_an = None
+        if "expected" in df_vao.columns:
+            dap_an = df_vao["expected"].astype(str)
+            cot_dap_an = "expected"
+        elif "risk_level" in df_vao.columns:
+            dap_an = df_vao["risk_level"].map(MUC_NGUY_CO)
+            cot_dap_an = "risk_level"
+
+        if cot_dap_an is not None:
+            df_ra["Khớp đáp án"] = df_ra["Mức nguy cơ"] == dap_an.values
+            cham = df_ra[df_ra["Mức nguy cơ"] != "LỖI"]
+            n_khop = int(cham["Khớp đáp án"].sum())
+            # "Bỏ sót" = đáp án Cao mà hệ thống nói nhẹ hơn. Đây là loại sai
+            # nguy hiểm, phải tách riêng chứ không gộp chung vào "sai".
+            bo_sot = cham[
+                (dap_an.reindex(cham.index) == "Cao") & (cham["Mức nguy cơ"] != "Cao")
+            ]
+            st.subheader(f"Chấm điểm (dùng cột `{cot_dap_an}` làm đáp án)")
+            d1, d2, d3 = st.columns(3)
+            d1.metric("Khớp đáp án", f"{n_khop}/{len(cham)}")
+            d2.metric("Tỉ lệ", f"{100 * n_khop / max(len(cham), 1):.1f}%")
+            d3.metric("Bỏ sót ca Cao", len(bo_sot), help="Loại sai nguy hiểm nhất")
+            st.caption(
+                "Nhìn ô **Bỏ sót ca Cao** trước tiên. Tỉ lệ khớp chung có thể đẹp "
+                "trong khi vẫn bỏ sót đúng những ca nguy hiểm nhất."
+            )
+
+        st.dataframe(df_ra, use_container_width=True, hide_index=True)
+        st.download_button(
+            "⬇  Tải kết quả về (CSV)",
+            data=df_ra.to_csv(index=False).encode("utf-8-sig"),
+            file_name=f"ket_qua_hang_loat_{datetime.now():%Y%m%d_%H%M%S}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        st.caption(
+            "File tải về dùng encoding utf-8-sig để mở bằng Excel không lỗi font."
+        )
+
+
+# ---------------------------------------------------------------------------
+# TRANG 3 — LỊCH SỬ CA TRONG PHIÊN
 # ---------------------------------------------------------------------------
 
-elif trang.startswith("2"):
+elif ten_trang == "Lịch sử ca":
+    st.title("Lịch sử các ca đã sàng lọc")
+    st.caption(
+        "Chỉ lưu trong bộ nhớ của phiên làm việc này. Tắt app là mất hết — "
+        "đúng theo phần đạo đức dữ liệu: không có file bệnh nhân nào nằm lại "
+        "trên máy mà người dùng không biết."
+    )
+
+    lich_su = st.session_state.get("lich_su", [])
+
+    if not lich_su:
+        st.info("Chưa sàng lọc ca nào trong phiên này. Hãy bắt đầu ở trang Sàng lọc.")
+    else:
+        df_ls = pd.DataFrame(lich_su)
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Tổng số ca", len(df_ls))
+        for cot, (nhan, muc) in zip(
+            (c2, c3, c4), [("Nguy cơ Cao", "Cao"), ("Trung bình", "Trung bình"),
+                           ("Thấp", "Thấp")]
+        ):
+            cot.metric(nhan, int((df_ls["Mức nguy cơ"] == muc).sum()))
+
+        st.write("")
+        st.markdown("### Bảng chi tiết")
+        st.dataframe(df_ls, use_container_width=True, hide_index=True)
+
+        st.markdown("### Phân bố mức nguy cơ")
+        dem = (
+            df_ls["Mức nguy cơ"]
+            .value_counts()
+            .reindex(["Thấp", "Trung bình", "Cao"])
+            .fillna(0)
+            .astype(int)
+        )
+        st.bar_chart(pd.DataFrame({"Số ca": dem}), height=200, color="#0F766E")
+
+        st.markdown("### Nguồn kết luận")
+        st.caption(
+            "Cột này trả lời một câu giám khảo hay hỏi: trong thực tế, bao nhiêu "
+            "phần trăm kết luận đến từ QUY TẮC chứ không phải AI?"
+        )
+        st.bar_chart(
+            pd.DataFrame({"Số ca": df_ls["Nguồn kết luận"].value_counts()}),
+            height=200,
+            color="#0F766E",
+        )
+
+        st.write("")
+        c_tai, c_xoa = st.columns(2)
+        c_tai.download_button(
+            "⬇  Tải lịch sử về (CSV)",
+            data=df_ls.to_csv(index=False).encode("utf-8-sig"),
+            file_name=f"lich_su_breathsafe_{datetime.now():%Y%m%d_%H%M%S}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        if c_xoa.button("Xoá toàn bộ lịch sử", use_container_width=True):
+            st.session_state["lich_su"] = []
+            st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# TRANG 4 — PHẢN HỒI BÁC SĨ
+# ---------------------------------------------------------------------------
+
+elif ten_trang == "Phản hồi bác sĩ":
     st.title("Phản hồi của nhân viên y tế")
     st.write(
         "Đây là điểm khác biệt của BreathSafe: **AI học từ bác sĩ, không thay "
@@ -781,32 +1202,51 @@ elif trang.startswith("2"):
             luu = st.form_submit_button("Gửi phản hồi", type="primary")
 
         if luu:
+            # Kiểm tra trước khi ghi. Dùng danh sách lỗi + `else` thay cho
+            # st.stop(): st.stop() cắt luôn phần thống kê phản hồi ở cuối trang,
+            # nên người dùng gõ nhầm một ô là mất nốt bảng tổng hợp bên dưới,
+            # trông như app vừa hỏng.
+            loi_nhap = []
+
             # Ô chọn mức ở trên mặc định đúng bằng mức AI vừa đưa ra. Nếu bác sĩ
             # bấm "KHÔNG đồng ý" mà quên kéo ô đó sang mức khác, hệ thống sẽ ghi
             # một ca "bất đồng" có nhãn bác sĩ TRÙNG với nhãn AI — rồi retrain.py
             # đem chính nhãn AI đó dạy lại mô hình với trọng số gấp 5 lần, tức là
             # củng cố đúng cái kết quả mà bác sĩ vừa bác bỏ. Phải chặn ở đây.
             if hanh_dong == "disagree" and nhan_bs == ket_qua.ten_muc:
-                st.error(
+                loi_nhap.append(
                     f"Anh/chị chọn KHÔNG đồng ý nhưng mức đã chọn vẫn là "
                     f"**{nhan_bs}** — trùng với kết quả của hệ thống. "
                     "Hãy chọn mức đúng theo anh/chị ở ô bên trên, hoặc đổi ý "
                     "kiến sang 'Đồng ý'."
                 )
-                st.stop()
-            try:
-                vong_lap.record(
-                    case_input={k: ca[k] for k in DAC_TRUNG},
-                    ai_prediction=ket_qua.ten_muc,
-                    ai_confidence=ket_qua.do_tin_cay,
-                    action=hanh_dong,
-                    physician_label=nhan_bs if hanh_dong == "disagree" else None,
-                    physician_reason=ly_do,
-                    physician_id=ma_bs,
+            # Ô lý do ghi rõ "bắt buộc khi không đồng ý" nhưng bản trước không
+            # kiểm tra gì cả. Một ca bất đồng KHÔNG có lý do chuyên môn thì
+            # retrain.py vẫn đem nó dạy lại mô hình với trọng số gấp 5 — mà
+            # không ai còn biết vì sao bác sĩ đổi nhãn, kể cả chính bác sĩ đó.
+            if hanh_dong == "disagree" and not ly_do.strip():
+                loi_nhap.append(
+                    "Thiếu **lý do chuyên môn**. Đây là phần có giá trị nhất của "
+                    "một ca bất đồng — nó là thứ giải thích vì sao mô hình cần sửa."
                 )
-                st.success("Đã ghi nhận phản hồi. Cảm ơn anh/chị.")
-            except ValueError as loi:
-                st.error(f"Chưa gửi được: {loi}")
+
+            if loi_nhap:
+                for x in loi_nhap:
+                    st.error(x)
+            else:
+                try:
+                    vong_lap.record(
+                        case_input={k: ca[k] for k in DAC_TRUNG},
+                        ai_prediction=ket_qua.ten_muc,
+                        ai_confidence=ket_qua.do_tin_cay,
+                        action=hanh_dong,
+                        physician_label=nhan_bs if hanh_dong == "disagree" else None,
+                        physician_reason=ly_do,
+                        physician_id=ma_bs,
+                    )
+                    st.success("Đã ghi nhận phản hồi. Cảm ơn anh/chị.")
+                except ValueError as loi:
+                    st.error(f"Chưa gửi được: {loi}")
 
     st.divider()
     st.subheader("Tổng hợp phản hồi đã thu được")
@@ -831,27 +1271,81 @@ elif trang.startswith("2"):
 
 
 # ---------------------------------------------------------------------------
-# TRANG 3 — CA KINH ĐIỂN
+# TRANG 5 — CA KINH ĐIỂN
 # ---------------------------------------------------------------------------
 
-elif trang.startswith("3"):
-    st.title("Bộ 20 ca lâm sàng kinh điển")
+elif ten_trang == "Ca lâm sàng":
+    st.title(f"Bộ {len(CA_KINH_DIEN)} ca lâm sàng kinh điển")
     st.write(
         "Mỗi ca ở đây là một **bài học y khoa** — một tình huống mà người mới "
         "thường đánh giá sai. Bộ này kiểm tra hệ thống có hiểu y khoa không, "
         "chứ không chỉ đo độ chính xác trung bình trên dữ liệu mô phỏng."
     )
 
-    if not BS_DA_KY:
+    if not DA_DUYET:
         st.error(
             "**Bộ ca này CHƯA có chữ ký bác sĩ.** Các nhãn dưới đây do học sinh "
             "soạn từ tài liệu y khoa phổ thông và chưa có giá trị chuyên môn. "
             "Cần bác sĩ tư vấn duyệt và ký trước khi đưa vào báo cáo."
         )
     else:
-        st.success(f"Bộ ca đã được duyệt bởi: {TEN_BAC_SI_DUYET}")
+        ngay = f" · ngày {NGAY_DUYET}" if NGAY_DUYET.strip() else ""
+        st.success(f"Bộ ca đã được duyệt bởi: {TEN_BAC_SI_DUYET}{ngay}")
 
-    duong_dan = Path("ket_qua_ca_kinh_dien.csv")
+    # --- Chạy lại bộ ca NGAY TRONG APP ------------------------------------
+    # File ket_qua_ca_kinh_dien.csv bên dưới là kết quả của lần chạy
+    # `python huan_luyen.py` gần nhất — nó có thể đã cũ so với mô hình đang
+    # nạp trong app (ví dụ sau khi retrain). Nút này chấm lại tại chỗ bằng
+    # ĐÚNG mô hình app đang dùng, nên giám khảo bấm một nút là thấy bằng chứng
+    # thật chứ không phải một con số lưu từ hôm trước.
+    with st.container(border=True):
+        st.markdown("### Tự kiểm tra tại chỗ")
+        st.caption(
+            "Chạy lại toàn bộ bộ ca bằng chính mô hình app đang nạp, so với "
+            "bảng lưu sẵn ở dưới (kết quả của lần huấn luyện gần nhất)."
+        )
+        if st.button("▶  Chạy lại bộ ca ngay bây giờ", use_container_width=True):
+            dong_tu_kiem = []
+            for c in CA_KINH_DIEN:
+                try:
+                    kq = he_thong.danh_gia(c["input"])
+                    he_thong_noi, nguon = kq.ten_muc, kq.nguon
+                except Exception as loi:
+                    he_thong_noi, nguon = f"LỖI: {loi}", "—"
+                khop = he_thong_noi == c["expected_label"]
+                dong_tu_kiem.append(
+                    {
+                        "id": c["id"],
+                        "Tên ca": c["name"],
+                        "Hệ thống nói": he_thong_noi,
+                        "Đáp án": c["expected_label"],
+                        "Khớp": khop,
+                        "Nguồn": nguon,
+                    }
+                )
+            st.session_state["tu_kiem"] = dong_tu_kiem
+
+        if "tu_kiem" in st.session_state:
+            df_tk = pd.DataFrame(st.session_state["tu_kiem"])
+            n_khop_tk = int(df_tk["Khớp"].sum())
+            # Bỏ sót = đáp án Cao mà hệ thống nói nhẹ hơn — loại sai nguy hiểm.
+            bo_sot_tk = df_tk[
+                (df_tk["Đáp án"] == "Cao") & (df_tk["Hệ thống nói"] != "Cao")
+            ]
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Khớp đáp án", f"{n_khop_tk}/{len(df_tk)}")
+            c2.metric("Tỉ lệ", f"{100 * n_khop_tk / len(df_tk):.0f}%")
+            c3.metric("Bỏ sót ca Cao", len(bo_sot_tk))
+            st.dataframe(df_tk, use_container_width=True, hide_index=True)
+            if len(bo_sot_tk):
+                st.error(
+                    "Các ca bị bỏ sót: **"
+                    + ", ".join(bo_sot_tk["id"])
+                    + "**. Phải phân tích trung thực trong báo cáo, không được giấu."
+                )
+
+    st.divider()
+    duong_dan = THU_MUC / "ket_qua_ca_kinh_dien.csv"
     if duong_dan.exists():
         df = pd.read_csv(duong_dan)
         n_khop = int(df["match"].sum())
@@ -879,7 +1373,7 @@ elif trang.startswith("3"):
         st.info("Chưa có kết quả. Chạy `python huan_luyen.py` để sinh ra.")
 
     st.divider()
-    st.subheader("Chi tiết 20 ca")
+    st.subheader(f"Chi tiết {len(CA_KINH_DIEN)} ca")
     for c in CA_KINH_DIEN:
         with st.expander(f"{c['id']} — {c['name']}  (đáp án: {c['expected_label']})"):
             st.write(f"**Mô tả:** {c['description']}")
@@ -888,10 +1382,10 @@ elif trang.startswith("3"):
 
 
 # ---------------------------------------------------------------------------
-# TRANG 4 — VỀ HỆ THỐNG
+# TRANG 6 — VỀ HỆ THỐNG
 # ---------------------------------------------------------------------------
 
-elif trang.startswith("4"):
+elif ten_trang == "Về hệ thống":
     st.title("Hệ thống hoạt động thế nào")
 
     st.subheader("Ba lớp an toàn")
@@ -982,7 +1476,7 @@ Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
         )
     )
 
-    duong_dan = Path("ket_qua_so_sanh.csv")
+    duong_dan = THU_MUC / "ket_qua_so_sanh.csv"
     if duong_dan.exists():
         st.subheader("So sánh các mô hình")
         st.dataframe(pd.read_csv(duong_dan), use_container_width=True, hide_index=True)
@@ -991,16 +1485,16 @@ Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
             "mô hình luôn nói 'Thấp' vẫn đạt Accuracy ~50% mà bỏ sót 100% ca nguy hiểm."
         )
 
-    if Path("reliability_diagram.png").exists():
+    if (THU_MUC / "reliability_diagram.png").exists():
         st.subheader("Biểu đồ độ tin cậy (Reliability diagram)")
-        st.image("reliability_diagram.png")
+        st.image(str(THU_MUC / "reliability_diagram.png"))
         st.caption(
             "Đường mô hình càng sát đường chéo đứt nét thì xác suất càng đáng tin."
         )
 
 
 # ---------------------------------------------------------------------------
-# TRANG 5 — GIỚI HẠN VÀ ĐẠO ĐỨC
+# TRANG 7 — GIỚI HẠN VÀ ĐẠO ĐỨC
 # ---------------------------------------------------------------------------
 
 else:
