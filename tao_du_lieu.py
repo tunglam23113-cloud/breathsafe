@@ -38,6 +38,10 @@ import numpy as np
 import pandas as pd
 
 from dac_trung import DAC_TRUNG
+# Bảng nhịp thở bình thường theo tuổi nằm ở quy_tac.py để cả hệ thống dùng chung
+# MỘT bảng duy nhất. Trước đây file này giữ một bản sao riêng, nên sửa bảng ở một
+# nơi mà quên nơi kia là dữ liệu và quy tắc lệch nhau mà không ai biết.
+from quy_tac import nhip_tho_binh_thuong
 from tieng_viet import bat_tieng_viet
 
 # Cố định số ngẫu nhiên → chạy lại luôn ra bộ dữ liệu y hệt.
@@ -48,26 +52,6 @@ RANDOM_STATE = 42
 # ---------------------------------------------------------------------------
 # BƯỚC 1: Các hàm y khoa cơ bản
 # ---------------------------------------------------------------------------
-
-
-def nhip_tho_binh_thuong(tuoi):
-    """Nhịp thở bình thường theo tuổi (lần/phút).
-
-    Trẻ càng nhỏ thở càng nhanh — đây là kiến thức y khoa cơ bản mà nhiều người
-    quên. Một em bé 2 tuổi thở 30 lần/phút là BÌNH THƯỜNG, nhưng người lớn thở
-    30 lần/phút là dấu hiệu suy hô hấp.
-
-    Nguồn: bảng nhịp thở theo tuổi của WHO (cần bác sĩ xác nhận lại).
-    """
-    if tuoi < 1:
-        return 40
-    if tuoi < 3:
-        return 30
-    if tuoi < 6:
-        return 25
-    if tuoi < 12:
-        return 20
-    return 16
 
 
 def diem_nguy_co(ca):
@@ -283,7 +267,17 @@ def tao_bo_du_lieu(so_ca=2000, ty_le_nhieu=0.05, random_state=RANDOM_STATE):
             cot = rng.choice(["dyspnea", "cough", "fatigue", "chest_pain"])
             df.loc[i, cot] = 1 - df.loc[i, cot]
         else:
-            df.loc[i, "temperature"] = round(float(df.loc[i, "temperature"]) + float(rng.normal(0, 1.0)), 1)
+            # Kẹp lại trong khoảng 35.0–42.0°C. Nhiễu không kẹp có thể sinh ra
+            # nhiệt độ 34.1 hay 43.5 — vừa vô lý về sinh lý, vừa nằm NGOÀI dải
+            # thanh trượt của app (35.0–42.0), nên mô hình được học trên những
+            # giá trị mà lúc dùng thật không bao giờ nhập vào được.
+            df.loc[i, "temperature"] = round(
+                float(np.clip(
+                    float(df.loc[i, "temperature"]) + float(rng.normal(0, 1.0)),
+                    35.0, 42.0,
+                )),
+                1,
+            )
 
     # LƯU Ý: nhãn risk_level KHÔNG được tính lại sau khi thêm nhiễu.
     # Đó chính là mục đích: nhãn phản ánh tình trạng THẬT của bệnh nhân, còn các

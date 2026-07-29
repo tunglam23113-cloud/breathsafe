@@ -9,7 +9,6 @@ Thiết kế hướng đến người dùng thật ở trạm y tế xã:
   - Mỗi kết quả đều có lý do, không bao giờ chỉ hiện một con số
 """
 
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -19,8 +18,9 @@ from health_core import PhysicianFeedbackLoop
 
 import am_thanh
 from ca_kinh_dien import BS_DA_KY, CA_KINH_DIEN, TEN_BAC_SI_DUYET
-from dac_trung import DAC_TRUNG, MUC_NGUY_CO
+from dac_trung import DAC_TRUNG
 from he_thong import HeThongBreathSafe
+from quy_tac import nguong_tho_nhanh_nguy_hiem, nhip_tho_binh_thuong
 
 FILE_MO_HINH = "mo_hinh_breathsafe.joblib"
 FILE_PHAN_HOI = "phan_hoi_bac_si.json"
@@ -377,7 +377,13 @@ def khoi_ghi_am_ho():
                 # nhưng là một Ô RIÊNG, KHÔNG cộng vào mức nguy cơ bên dưới.
                 mo_hinh_ho = nap_mo_hinh_ho()
                 if mo_hinh_ho is not None:
-                    hang = pd.DataFrame([dac_trung_ho])  # đúng thứ tự cột FEATURE_NAMES
+                    # Ép đúng thứ tự cột FEATURE_NAMES thay vì tin vào thứ tự
+                    # khoá của dict. Mô hình chỉ thấy các con số, không thấy tên
+                    # cột — lệch thứ tự thì nó đọc nhầm hoàn toàn mà KHÔNG báo lỗi
+                    # (cùng lý do đã ghi trong dac_trung.py).
+                    from health_core.audio import FEATURE_NAMES
+
+                    hang = pd.DataFrame([dac_trung_ho])[list(FEATURE_NAMES)]
                     cot_1 = list(mo_hinh_ho.classes_).index(1)
                     p_bat_thuong = float(mo_hinh_ho.predict_proba(hang)[0][cot_1])
                     nhan = "Bất thường" if p_bat_thuong >= 0.5 else "Khỏe"
@@ -627,9 +633,16 @@ if trang.startswith("1"):
 
             # Hiện lại các chỉ số kèm màu, để người dùng đối chiếu nhanh
             # mà không phải cuộn ngược lên form.
+            # Ngưỡng nhịp thở phải theo TUỔI, giống hệt bộ quy tắc — nếu không,
+            # một bé 2 tuổi thở 30 lần/phút (hoàn toàn bình thường) sẽ hiện chữ
+            # đỏ "Bất thường" trong khi hệ thống lại kết luận nguy cơ Thấp.
+            nguong_rr_xau = nguong_tho_nhanh_nguy_hiem(ca["age"])
+            nguong_rr_vua = nhip_tho_binh_thuong(ca["age"]) + 6
+
             for nhan, gt, don_vi, args in [
                 ("SpO2", ca["spo2"], "%", (91, 94, False)),
-                ("Nhịp thở", ca["respiratory_rate"], "l/p", (30, 22, True)),
+                ("Nhịp thở", ca["respiratory_rate"], "l/p",
+                 (nguong_rr_xau + 1, nguong_rr_vua + 1, True)),
                 ("Nhiệt độ", ca["temperature"], "°C", (39.0, 38.5, True)),
             ]:
                 chinh, nen, trang_thai = the_chi_so(gt, args[0], args[1], args[2])
@@ -660,14 +673,20 @@ if trang.startswith("1"):
         with k1:
             with st.container(border=True):
                 st.markdown("### Khuyến nghị cho nhân viên y tế")
+                # Dùng thẻ <b> chứ KHÔNG dùng **…** của Markdown: mấy dòng này
+                # được nhét vào trong một <div> HTML thô ở dưới (unsafe_allow_html),
+                # mà bên trong HTML thì Streamlit không dịch Markdown nữa — nên
+                # **…** hiện nguyên hai dấu sao trên màn hình. Chỗ hỏng nặng nhất
+                # là dòng mức CAO: người dùng đọc thấy "**Cần nhân viên y tế
+                # kiểm tra NGAY**" thay vì chữ in đậm.
                 khuyen_nghi = {
                     2: [
-                        "**Cần nhân viên y tế kiểm tra NGAY**",
+                        "<b>Cần nhân viên y tế kiểm tra NGAY</b>",
                         "Cân nhắc hội chẩn hoặc chuyển tuyến",
                         "Không tự ý dùng thuốc",
                     ],
                     1: [
-                        "Nên được nhân viên y tế khám **trong hôm nay**",
+                        "Nên được nhân viên y tế khám <b>trong hôm nay</b>",
                         "Theo dõi sát; nếu nặng lên phải đi khám ngay",
                     ],
                     0: [
@@ -687,14 +706,16 @@ if trang.startswith("1"):
             with st.container(border=True):
                 st.markdown("### Bản dành cho gia đình")
                 st.caption("Lời dặn bằng câu đơn giản, để đọc cho người nhà nghe.")
+                # Cũng phải dùng <b> vì lý do y hệt khối khuyến nghị ở trên: đoạn
+                # này nằm trong <div> HTML thô nên **…** không được dịch.
                 loi_gia_dinh = {
-                    2: "Hiện tại người bệnh **có dấu hiệu nguy hiểm**. Anh/chị nên "
-                       "đưa người bệnh đến bệnh viện huyện **ngay hôm nay**.",
-                    1: "Người bệnh **cần được nhân viên y tế xem**. Anh/chị nên đưa "
+                    2: "Hiện tại người bệnh <b>có dấu hiệu nguy hiểm</b>. Anh/chị nên "
+                       "đưa người bệnh đến bệnh viện huyện <b>ngay hôm nay</b>.",
+                    1: "Người bệnh <b>cần được nhân viên y tế xem</b>. Anh/chị nên đưa "
                        "đến trạm y tế trong hôm nay để kiểm tra cho chắc.",
-                    0: "Hiện tại **chưa thấy dấu hiệu nguy hiểm**. Anh/chị cho người "
-                       "bệnh nghỉ ngơi, uống nhiều nước. Nếu thấy **khó thở** hoặc "
-                       "**sốt cao không giảm**, hãy đưa đi khám ngay.",
+                    0: "Hiện tại <b>chưa thấy dấu hiệu nguy hiểm</b>. Anh/chị cho người "
+                       "bệnh nghỉ ngơi, uống nhiều nước. Nếu thấy <b>khó thở</b> hoặc "
+                       "<b>sốt cao không giảm</b>, hãy đưa đi khám ngay.",
                 }[ket_qua.muc]
                 st.markdown(
                     f'<div style="background:{m["nen"]};border-radius:10px;'
@@ -760,6 +781,19 @@ elif trang.startswith("2"):
             luu = st.form_submit_button("Gửi phản hồi", type="primary")
 
         if luu:
+            # Ô chọn mức ở trên mặc định đúng bằng mức AI vừa đưa ra. Nếu bác sĩ
+            # bấm "KHÔNG đồng ý" mà quên kéo ô đó sang mức khác, hệ thống sẽ ghi
+            # một ca "bất đồng" có nhãn bác sĩ TRÙNG với nhãn AI — rồi retrain.py
+            # đem chính nhãn AI đó dạy lại mô hình với trọng số gấp 5 lần, tức là
+            # củng cố đúng cái kết quả mà bác sĩ vừa bác bỏ. Phải chặn ở đây.
+            if hanh_dong == "disagree" and nhan_bs == ket_qua.ten_muc:
+                st.error(
+                    f"Anh/chị chọn KHÔNG đồng ý nhưng mức đã chọn vẫn là "
+                    f"**{nhan_bs}** — trùng với kết quả của hệ thống. "
+                    "Hãy chọn mức đúng theo anh/chị ở ô bên trên, hoặc đổi ý "
+                    "kiến sang 'Đồng ý'."
+                )
+                st.stop()
             try:
                 vong_lap.record(
                     case_input={k: ca[k] for k in DAC_TRUNG},

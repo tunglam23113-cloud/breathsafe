@@ -23,15 +23,42 @@ from pathlib import Path
 
 from ca_kinh_dien import CA_KINH_DIEN
 from dac_trung import TEN_TIENG_VIET
+from quy_tac import nguong_tho_nhanh_nguy_hiem, nhip_tho_binh_thuong
 from tieng_viet import bat_tieng_viet
 
 THU_MUC = Path("ho_so")
 
-O_TRONG = "\n\n_Bác sĩ sửa lại nếu chưa hợp lý:_ ................................................\n"
+# Mốc tuổi để in bảng. Hai hàm ngưỡng chia nhóm tuổi KHÁC NHAU, nên mỗi bảng
+# phải có danh sách mốc riêng — dùng chung một danh sách thì nhãn dòng sẽ nói
+# sai (ví dụ gộp "3 – 5 tuổi" trong khi trẻ 5 tuổi đã sang ngưỡng người lớn).
+# Giá trị ở cột bên phải KHÔNG gõ tay mà gọi thẳng hàm trong quy_tac.py, nên
+# phiếu bác sĩ ký không bao giờ lệch với code đang chạy.
+MOC_BINH_THUONG = [
+    ("Dưới 1 tuổi", 0),
+    ("1 – 2 tuổi", 1),
+    ("3 – 5 tuổi", 3),
+    ("6 – 11 tuổi", 6),
+    ("Từ 12 tuổi", 12),
+]
+MOC_BAO_DONG = [
+    ("Dưới 1 tuổi", 0),
+    ("1 – 4 tuổi", 1),
+    ("Từ 5 tuổi", 5),
+]
+
+
+def bang_nhip_tho(ham, tieu_de, moc_tuoi):
+    """Dựng bảng markdown ngưỡng nhịp thở theo tuổi, lấy số từ chính quy_tac.py."""
+    dong = [f"| Tuổi | {tieu_de} | Bác sĩ đồng ý? |", "|---|:-:|:-:|"]
+    for nhan, tuoi in moc_tuoi:
+        dong.append(f"| {nhan} | {ham(tuoi)} | ☐ Đồng ý ☐ Sửa: ......... |")
+    return "\n".join(dong)
 
 
 def phieu_bo_quy_tac():
     """Phiếu duyệt bộ quy tắc cảnh báo đỏ."""
+    nguong_nl = nguong_tho_nhanh_nguy_hiem(30)      # ngưỡng báo động của người lớn
+    chu_y_nl = nhip_tho_binh_thuong(30) + 6         # ngưỡng "hơi nhanh" của người lớn
     return f"""# PHIẾU DUYỆT CHUYÊN MÔN — BỘ QUY TẮC CẢNH BÁO ĐỎ
 
 **Đề tài:** BreathSafe — Trợ lý AI hỗ trợ nhân viên y tế tuyến xã sàng lọc sớm
@@ -69,13 +96,13 @@ ngay lập tức**, không cần hỏi ý kiến mô hình AI.
 
 | # | Quy tắc | Lý do cháu đưa vào | Bác sĩ đồng ý? |
 |:-:|---|---|:-:|
-| 1 | SpO2 < 92% **và** có khó thở | Dấu hiệu suy hô hấp | ☐ Đồng ý ☐ Không |
-| 2 | SpO2 < 90% (kể cả không khó thở) | "Silent hypoxia" — có bệnh nhân thiếu oxy nặng mà vẫn tỉnh táo | ☐ Đồng ý ☐ Không |
+| 1 | SpO2 < 90% (kể cả khi không khó thở) | "Silent hypoxia" — có bệnh nhân thiếu oxy nặng mà vẫn tỉnh táo | ☐ Đồng ý ☐ Không |
+| 2 | SpO2 < 92% **và** có khó thở | Dấu hiệu suy hô hấp | ☐ Đồng ý ☐ Không |
 | 3 | Đau ngực **và** khó thở **và** mới bệnh ≤ 1 ngày | Nghi thuyên tắc phổi / tràn khí màng phổi | ☐ Đồng ý ☐ Không |
 | 4 | Tuổi < 5 **và** có khó thở | Trẻ nhỏ suy hô hấp rất nhanh | ☐ Đồng ý ☐ Không |
 | 5 | Tuổi > 65 **và** có sốt **và** nhịp thở > 24 | Người già viêm phổi có thể không sốt cao rõ | ☐ Đồng ý ☐ Không |
 | 6 | Nhiệt độ > 39°C **và** bệnh > 3 ngày **và** mệt nhiều | Sốt cao kéo dài | ☐ Đồng ý ☐ Không |
-| 7 | Nhịp thở > 30 **và** tuổi ≥ 12 | Suy hô hấp ở người lớn | ☐ Đồng ý ☐ Không |
+| 7 | Nhịp thở vượt **ngưỡng theo tuổi** ở PHẦN 3B (người lớn: > {nguong_nl}) | Thở nhanh là dấu hiệu suy hô hấp; ngưỡng của trẻ khác người lớn | ☐ Đồng ý ☐ Không |
 
 **Bác sĩ có thấy thiếu quy tắc nào quan trọng không?**
 
@@ -95,7 +122,7 @@ hệ thống tự nâng lên mức **Trung bình** cho an toàn.
 | # | Dấu hiệu | Bác sĩ đồng ý? |
 |:-:|---|:-:|
 | 1 | SpO2 trong khoảng 92–94% | ☐ Đồng ý ☐ Không |
-| 2 | Nhịp thở > 22 lần/phút | ☐ Đồng ý ☐ Không |
+| 2 | Nhịp thở vượt mức bình thường của tuổi **cộng 6** (người lớn: > {chu_y_nl}) | ☐ Đồng ý ☐ Không |
 | 3 | Nhiệt độ > 38.5°C | ☐ Đồng ý ☐ Không |
 | 4 | Có bệnh nền | ☐ Đồng ý ☐ Không |
 | 5 | Bệnh đã > 5 ngày chưa đỡ | ☐ Đồng ý ☐ Không |
@@ -108,18 +135,23 @@ hệ thống tự nâng lên mức **Trung bình** cho an toàn.
 
 ---
 
-## PHẦN 3 — Bảng nhịp thở bình thường theo tuổi
+## PHẦN 3A — Bảng nhịp thở BÌNH THƯỜNG theo tuổi
 
 Hệ thống dùng bảng này để biết một người thở nhanh hay không (trẻ nhỏ thở nhanh
-hơn người lớn là bình thường).
+hơn người lớn là bình thường). Một ca bị coi là "hơi nhanh" (PHẦN 2, mục 2) khi
+vượt con số này **cộng 6**.
 
-| Tuổi | Nhịp thở bình thường (lần/phút) | Bác sĩ đồng ý? |
-|---|:-:|:-:|
-| Dưới 1 tuổi | 40 | ☐ Đồng ý ☐ Sửa: ......... |
-| 1 – 2 tuổi | 30 | ☐ Đồng ý ☐ Sửa: ......... |
-| 3 – 5 tuổi | 25 | ☐ Đồng ý ☐ Sửa: ......... |
-| 6 – 11 tuổi | 20 | ☐ Đồng ý ☐ Sửa: ......... |
-| Từ 12 tuổi | 16 | ☐ Đồng ý ☐ Sửa: ......... |
+{bang_nhip_tho(nhip_tho_binh_thuong, "Nhịp thở bình thường (lần/phút)", MOC_BINH_THUONG)}
+
+---
+
+## PHẦN 3B — Ngưỡng thở nhanh ĐÁNG BÁO ĐỘNG ĐỎ theo tuổi
+
+Vượt ngưỡng này thì hệ thống kết luận **nguy cơ CAO ngay** (PHẦN 1, quy tắc 7).
+Cháu lấy theo tiêu chí "thở nhanh" (fast breathing) của WHO cho trẻ em, ghép với
+ngưỡng người lớn. Đây là phần cháu mong bác sĩ xem kỹ nhất.
+
+{bang_nhip_tho(nguong_tho_nhanh_nguy_hiem, "Báo động khi nhịp thở vượt quá", MOC_BAO_DONG)}
 
 ---
 

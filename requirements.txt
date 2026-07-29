@@ -21,9 +21,25 @@ streamlit==1.41.1
 # trình duyệt — xem am_thanh.py và chay_desktop.py.
 sounddevice==0.5.1
 
+# Đọc/ghi file .wav. am_thanh.py gọi thẳng `import soundfile`, nên phải ghi ra
+# đây. Trước đây nó chỉ được cài kèm theo librosa — chỉ cần librosa đổi phụ
+# thuộc là nút "tải lên file tiếng ho" chết mà không ai biết trước.
+soundfile==0.12.1
+
 # GHI CHÚ: bản desktop KHÔNG dùng pywebview. Nó mở Chrome/Edge sẵn có ở chế độ
 # "app" (xem chay_desktop.py), nên không cần cài thêm thư viện cửa sổ nào.
 
+# scikit-learn PHẢI ghim phiên bản, không được để health-core tự chọn.
+#
+# Vì sao? Đây là lỗi tái lập (reproducibility) đã đo được thật: chạy đúng bộ dữ
+# liệu và đúng random_state=42, nhưng bằng scikit-learn 1.8.0 thay vì 1.9.0 thì
+# dòng "Chỉ AI" trong ket_qua_so_sanh.csv tụt Recall (Cao) từ 0.9167 xuống
+# 0.8500 — tức là con số quan trọng nhất của báo cáo đổi 6.7 điểm chỉ vì phiên
+# bản thư viện. Nếu giám khảo cài máy khác và ra số khác, không giải thích được.
+#
+# Mọi số trong báo cáo được sinh bằng đúng phiên bản dưới đây.
+scikit-learn==1.9.0
+
 # Các thư viện dưới đây được health-core tự cài kèm. Ghi lại ở đây để biết
 # chính xác phiên bản nào đã dùng khi chạy thí nghiệm:
-#   numpy, pandas, scikit-learn, scipy, joblib, librosa, matplotlib
+#   numpy, pandas, scipy, joblib, librosa, matplotlib

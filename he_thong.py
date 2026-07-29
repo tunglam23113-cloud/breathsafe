@@ -203,7 +203,7 @@ def in_ket_qua(ket_qua, ca):
     if ket_qua.nguon == "quy_tac":
         print("Nguồn: Quy tắc cảnh báo đỏ (không dùng AI cho ca này)")
     elif ket_qua.nguon == "hau_kiem":
-        print(f"Nguồn: Lớp hậu kiểm nâng mức (AI ban đầu đánh giá thấp hơn)")
+        print("Nguồn: Lớp hậu kiểm nâng mức (AI ban đầu đánh giá thấp hơn)")
         print(f"Độ tin cậy của AI: {ket_qua.do_tin_cay:.0%} (đã hiệu chuẩn)")
     else:
         print(f"Độ tin cậy: {ket_qua.do_tin_cay:.0%} (đã hiệu chuẩn)")

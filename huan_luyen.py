@@ -14,7 +14,6 @@ Toàn bộ phần tính toán khó nằm trong thư viện health-core (cài b�
 pip install health-core). File này chỉ ghép các bước lại theo đúng thứ tự.
 """
 
-import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
@@ -90,7 +89,7 @@ def main():
     df = doc_du_lieu()
     X_train, X_val, X_test, y_train, y_val, y_test = chia_du_lieu(df)
 
-    print(f"\n[BƯỚC 1] Chia dữ liệu")
+    print("\n[BƯỚC 1] Chia dữ liệu")
     print(f"  Train:      {len(X_train):>5} ca  ({100 * len(X_train) / len(df):.0f}%)")
     print(f"  Validation: {len(X_val):>5} ca  ({100 * len(X_val) / len(df):.0f}%)")
     print(f"  Test:       {len(X_test):>5} ca  ({100 * len(X_test) / len(df):.0f}%)")

@@ -26,6 +26,54 @@ Nguồn của các ngưỡng (cần bác sĩ xác nhận lại):
 """
 
 # ---------------------------------------------------------------------------
+# NGƯỠNG NHỊP THỞ THEO TUỔI — dùng chung cho cả hệ thống
+# ---------------------------------------------------------------------------
+# Đây là hai bảng tra y khoa, KHÔNG phải quy tắc. Mọi file khác (tao_du_lieu.py,
+# app.py) đều lấy từ đây, nên bác sĩ chỉ phải ký duyệt MỘT chỗ và không bao giờ
+# có chuyện file này ghi một ngưỡng còn file kia ghi ngưỡng khác.
+#
+# Vì sao phải chia theo tuổi? Trẻ càng nhỏ thở càng nhanh. Một bé 2 tuổi thở 30
+# lần/phút là HOÀN TOÀN BÌNH THƯỜNG, nhưng người lớn thở 30 lần/phút là dấu hiệu
+# suy hô hấp. Dùng một ngưỡng cố định cho mọi lứa tuổi sẽ báo động giả với gần
+# như mọi trẻ nhỏ — xem bài học của ca TC19 trong ca_kinh_dien.py.
+
+
+def nhip_tho_binh_thuong(tuoi):
+    """Nhịp thở BÌNH THƯỜNG theo tuổi (lần/phút).
+
+    Nguồn: bảng nhịp thở theo tuổi của WHO (cần bác sĩ xác nhận lại).
+    """
+    if tuoi < 1:
+        return 40
+    if tuoi < 3:
+        return 30
+    if tuoi < 6:
+        return 25
+    if tuoi < 12:
+        return 20
+    return 16
+
+
+def nguong_tho_nhanh_nguy_hiem(tuoi):
+    """Ngưỡng thở nhanh ĐÁNG BÁO ĐỘNG ĐỎ theo tuổi (lần/phút).
+
+    Lấy theo tiêu chí "thở nhanh" (fast breathing) của WHO trong hướng dẫn xử
+    trí nhiễm khuẩn hô hấp cấp ở trẻ em, ghép với ngưỡng người lớn:
+
+        dưới 1 tuổi : > 50
+        1 – 4 tuổi  : > 40
+        từ 5 tuổi   : > 30
+
+    Cần bác sĩ xác nhận lại.
+    """
+    if tuoi < 1:
+        return 50
+    if tuoi < 5:
+        return 40
+    return 30
+
+
+# ---------------------------------------------------------------------------
 # LỚP 1 — CÁC QUY TẮC CẢNH BÁO ĐỎ
 # ---------------------------------------------------------------------------
 
@@ -46,21 +94,25 @@ def kiem_tra_canh_bao_do(ca):
     """
     ly_do = []
 
-    # Quy tắc 1: Thiếu oxy kèm khó thở.
-    # Đây là dấu hiệu suy hô hấp — nguy hiểm nhất trong nhóm bệnh hô hấp.
-    if ca["spo2"] < 92 and ca["dyspnea"] == 1:
+    # Quy tắc 1: SpO2 rất thấp thì nguy hiểm kể cả khi bệnh nhân chưa thấy khó thở.
+    # Bài học y khoa: có bệnh nhân thiếu oxy nặng mà vẫn tỉnh táo, không thấy
+    # khó thở ("silent hypoxia"). Không được bỏ sót nhóm này.
+    #
+    # Quy tắc 1b: thiếu oxy nhẹ hơn (90–91%) nhưng KÈM khó thở — cũng là suy hô hấp.
+    #
+    # Hai nhánh dùng elif chứ không phải hai if riêng: một ca SpO2 88% có khó thở
+    # trúng cả hai điều kiện, và bản trước in ra hai dòng lý do gần trùng nhau
+    # ("SpO2 88% kèm khó thở" + "SpO2 88% rất thấp"), làm loãng phần giải thích.
+    if ca["spo2"] < 90:
+        them = " kèm khó thở" if ca["dyspnea"] == 1 else ""
+        ly_do.append(
+            f"SpO2 = {ca['spo2']}% rất thấp (dưới 90%){them} → nguy hiểm kể cả "
+            f"khi bệnh nhân chưa thấy khó thở"
+        )
+    elif ca["spo2"] < 92 and ca["dyspnea"] == 1:
         ly_do.append(
             f"SpO2 = {ca['spo2']}% (dưới ngưỡng 92%) kèm khó thở "
             f"→ dấu hiệu suy hô hấp"
-        )
-
-    # Quy tắc 1b: SpO2 rất thấp thì nguy hiểm kể cả khi bệnh nhân chưa thấy khó thở.
-    # Bài học y khoa: có bệnh nhân thiếu oxy nặng mà vẫn tỉnh táo, không thấy
-    # khó thở ("silent hypoxia"). Không được bỏ sót nhóm này.
-    if ca["spo2"] < 90:
-        ly_do.append(
-            f"SpO2 = {ca['spo2']}% rất thấp (dưới 90%) → nguy hiểm kể cả khi "
-            f"bệnh nhân chưa thấy khó thở"
         )
 
     # Quy tắc 2: Đau ngực kèm khó thở xuất hiện đột ngột.
@@ -96,10 +148,14 @@ def kiem_tra_canh_bao_do(ca):
         )
 
     # Quy tắc 6: Thở rất nhanh — dấu hiệu suy hô hấp bất kể nguyên nhân.
-    if ca["respiratory_rate"] > 30 and ca["age"] >= 12:
+    # Ngưỡng phải theo TUỔI. Bản trước dùng cố định "> 30 và tuổi >= 12", nên có
+    # hai lỗi: trẻ 5–11 tuổi thở 45 lần/phút KHÔNG trúng quy tắc nào (bỏ sót),
+    # còn trẻ nhỏ thì bị ngưỡng người lớn áp lên (báo động thừa).
+    nguong_nguy_hiem = nguong_tho_nhanh_nguy_hiem(ca["age"])
+    if ca["respiratory_rate"] > nguong_nguy_hiem:
         ly_do.append(
-            f"Nhịp thở {ca['respiratory_rate']} lần/phút (trên 30) ở người lớn "
-            f"→ dấu hiệu suy hô hấp"
+            f"Nhịp thở {ca['respiratory_rate']} lần/phút (trên ngưỡng "
+            f"{nguong_nguy_hiem} của tuổi {ca['age']}) → dấu hiệu suy hô hấp"
         )
 
     return ly_do
@@ -119,8 +175,19 @@ def dem_dau_hieu_dang_ngo(ca):
 
     if 92 <= ca["spo2"] < 95:
         dau_hieu.append(f"SpO2 = {ca['spo2']}% hơi thấp (bình thường >= 95%)")
-    if ca["respiratory_rate"] > 22:
-        dau_hieu.append(f"Nhịp thở {ca['respiratory_rate']} lần/phút hơi nhanh")
+
+    # Ngưỡng "hơi nhanh" = mức bình thường CỦA TUỔI ĐÓ cộng 6.
+    # Với người từ 12 tuổi: 16 + 6 = 22, đúng bằng ngưỡng cũ nên người lớn không
+    # đổi gì. Nhưng bản cũ dùng số 22 cố định cho mọi lứa tuổi, nên 98% trẻ dưới
+    # 6 tuổi có nhãn nguy cơ THẤP vẫn bị gắn cờ "thở nhanh", và 48% trong số đó
+    # bị lớp hậu kiểm nâng oan từ Thấp lên Trung bình.
+    nguong_chu_y = nhip_tho_binh_thuong(ca["age"]) + 6
+    if ca["respiratory_rate"] > nguong_chu_y:
+        dau_hieu.append(
+            f"Nhịp thở {ca['respiratory_rate']} lần/phút hơi nhanh "
+            f"(bình thường ở tuổi {ca['age']} là khoảng "
+            f"{nhip_tho_binh_thuong(ca['age'])})"
+        )
     if ca["temperature"] > 38.5:
         dau_hieu.append(f"Sốt {ca['temperature']}°C khá cao")
     if ca["comorbidity"] == 1:
