@@ -27,7 +27,7 @@ from ca_kinh_dien import (
 )
 from dac_trung import DAC_TRUNG, MUC_NGUY_CO, TEN_TIENG_VIET
 from he_thong import HeThongBreathSafe
-from quy_tac import nguong_tho_nhanh_nguy_hiem, nhip_tho_binh_thuong
+from quy_tac import nguong_tho_hoi_nhanh, nguong_tho_nhanh_nguy_hiem
 
 # Mọi đường dẫn phải neo vào THƯ MỤC CHỨA FILE NÀY, không phải thư mục hiện
 # hành. Trước đây dùng đường dẫn tương đối trần, nên chạy `streamlit run
@@ -298,9 +298,12 @@ def cac_chi_so_sinh_ton(ca):
         # SpO2: quy tắc cảnh báo đỏ dùng < 92, dấu hiệu đáng ngờ dùng < 95.
         ("SpO2", ca["spo2"], "%", 92, 95, False),
         # Nhịp thở: ngưỡng báo động và ngưỡng "hơi nhanh", cả hai theo tuổi.
+        # Ngưỡng "hơi nhanh" gọi nguong_tho_hoi_nhanh() chứ KHÔNG tự cộng 6: hàm
+        # đó có phần kẹp để ngưỡng chú ý không vượt ngưỡng báo động (xem quy_tac.py).
+        # Tự cộng 6 ở đây thì thẻ chỉ số của trẻ 5 tuổi lệch với bộ quy tắc.
         ("Nhịp thở", ca["respiratory_rate"], " l/p",
          nguong_tho_nhanh_nguy_hiem(ca["age"]),
-         nhip_tho_binh_thuong(ca["age"]) + 6, True),
+         nguong_tho_hoi_nhanh(ca["age"]), True),
         # Nhiệt độ: quy tắc dùng > 39, dấu hiệu đáng ngờ dùng > 38.5.
         ("Nhiệt độ", ca["temperature"], "°C", 39.0, 38.5, True),
     ]
@@ -411,11 +414,21 @@ def phieu_html(ca, ket_qua):
         "hau_kiem": "Lớp hậu kiểm nâng mức (AI ban đầu đánh giá thấp hơn)",
         "ai": f"Mô hình AI · độ tin cậy {ket_qua.do_tin_cay:.0%} (đã hiệu chuẩn)",
     }.get(ket_qua.nguon, ket_qua.nguon)
-    canh_bao_ood = (
-        f"<p class='canhbao'><b>CẢNH BÁO CA LẠ:</b> {ket_qua.ood.message}</p>"
-        if ket_qua.la_ca_la
-        else ""
-    )
+    # Cùng lý do như banner trên màn hình: phiếu in cũng phải phân biệt "ca lạ"
+    # với "không nên tin kết quả". Tờ giấy rời khỏi màn hình sẽ được người khác
+    # đọc mà không có ngữ cảnh, nên câu chữ ở đây càng không được nói ngược.
+    if not ket_qua.nen_tin_ai:
+        canh_bao_ood = (
+            f"<p class='canhbao'><b>CẢNH BÁO CA LẠ — KHÔNG NÊN TIN KẾT QUẢ AI:</b> "
+            f"{ket_qua.ood.message}</p>"
+        )
+    elif ket_qua.la_ca_la:
+        canh_bao_ood = (
+            f"<p class='canhbao'><b>CẢNH BÁO CA LẠ:</b> {ket_qua.ood.message} "
+            f"Kết luận dưới đây đến từ quy tắc y khoa, không phải AI.</p>"
+        )
+    else:
+        canh_bao_ood = ""
     canh_bao_ky = (
         ""
         if DA_DUYET
@@ -818,9 +831,26 @@ if ten_trang == "Sàng lọc":
         # --- Cảnh báo ca lạ đứng TRƯỚC kết quả -------------------------
         # Nếu hệ thống chưa từng gặp ca tương tự, người dùng phải biết điều đó
         # TRƯỚC khi nhìn thấy con số, nếu không họ đã tin con số đó mất rồi.
-        if ket_qua.la_ca_la:
+        # Dùng nen_tin_ai chứ KHÔNG dùng la_ca_la trực tiếp. Hai chuyện này khác
+        # nhau: một ca có thể "lạ" so với dữ liệu huấn luyện NHƯNG kết luận lại
+        # đến từ quy tắc y khoa, tức là AI không hề tham gia quyết định.
+        #
+        # Bản trước dùng la_ca_la nên với ca TC20 (ung thư phổi giai đoạn muộn —
+        # ca lạ, và trúng quy tắc cảnh báo đỏ) app hiện một banner đỏ "không nên
+        # tin kết quả AI" ngay TRÊN dòng "Nguy cơ CAO". Nhân viên y tế đọc được
+        # thông điệp ngược hẳn với ý định: một cảnh báo đỏ đúng đắn, do quy tắc y
+        # khoa đưa ra, lại bị chính app dán nhãn "đừng tin". Đúng loại nhầm lẫn
+        # có thể khiến người dùng bỏ qua một ca nặng.
+        if not ket_qua.nen_tin_ai:
             st.error(
                 f"### ⚠️ Ca lạ — không nên tin kết quả AI\n\n{ket_qua.ood.message}"
+            )
+        elif ket_qua.la_ca_la:
+            st.warning(
+                f"### ⚠️ Ca lạ so với dữ liệu đã học\n\n{ket_qua.ood.message}\n\n"
+                "**Kết luận bên dưới đến từ QUY TẮC Y KHOA, không phải AI**, nên "
+                "cảnh báo này không làm giảm giá trị của nó — nhưng vẫn nên xem "
+                "kỹ vì hệ thống chưa từng gặp ca tương tự."
             )
 
         # --- Banner kết quả ---------------------------------------------
@@ -995,6 +1025,13 @@ elif ten_trang == "Sàng lọc hàng loạt":
             )
             st.stop()
 
+        # File chỉ có dòng tiêu đề mà không có ca nào: dừng tử tế ở đây. Bản
+        # trước đi tiếp và chết ở bước ghép bảng bên dưới (pd.DataFrame([]) không
+        # có cột "Dòng" để bỏ), ném KeyError ra giữa màn hình.
+        if df_vao.empty:
+            st.warning("File chỉ có dòng tiêu đề, chưa có ca nào để sàng lọc.")
+            st.stop()
+
         st.success(f"Đã đọc {len(df_vao)} ca. Đang sàng lọc…")
 
         ket_qua_dong = []
@@ -1024,8 +1061,24 @@ elif ten_trang == "Sàng lọc hàng loạt":
             thanh_tien_do.progress(vi_tri / len(df_vao))
         thanh_tien_do.empty()
 
+        df_cham = pd.DataFrame(ket_qua_dong).drop(columns=["Dòng"])
+        # Bỏ khỏi file gốc những cột TRÙNG TÊN với cột kết quả. Việc hay xảy ra
+        # nhất là người dùng tải file kết quả của lần chạy trước rồi nạp lại vào
+        # đây: khi đó bảng có HAI cột "Mức nguy cơ", nên df_ra["Mức nguy cơ"] trả
+        # về một DataFrame chứ không phải một cột, và cả trang chết ở dòng
+        # int((...).sum()) ngay bên dưới.
+        # "Khớp đáp án" cũng phải nằm trong danh sách: nó không do df_cham sinh ra
+        # mà được gán thêm ở bước chấm điểm phía dưới, nên nếu file nạp vào đã có
+        # cột đó thì vẫn thành hai cột trùng tên.
+        cot_ket_qua = list(df_cham.columns) + ["Khớp đáp án"]
+        trung_ten = [c for c in cot_ket_qua if c in df_vao.columns]
+        if trung_ten:
+            st.caption(
+                "Đã bỏ các cột trùng tên với cột kết quả trong file gốc: "
+                + ", ".join(f"`{c}`" for c in trung_ten)
+            )
         df_ra = pd.concat(
-            [df_vao.reset_index(drop=True), pd.DataFrame(ket_qua_dong).drop(columns=["Dòng"])],
+            [df_vao.drop(columns=trung_ten).reset_index(drop=True), df_cham],
             axis=1,
         )
 
@@ -1399,7 +1452,8 @@ Người bệnh đến trạm y tế
         ↓                                        khuyến cáo chuyển tuyến
 [LỚP 2] AI phân loại 3 mức (Random Forest đã hiệu chuẩn)
         ↓
-[LỚP 3] Hậu kiểm ──AI nói Thấp mà có ≥2 dấu hiệu đáng ngờ──→ nâng lên Trung bình
+[LỚP 3] Hậu kiểm ──AI nói Thấp mà có ≥2 dấu hiệu đáng ngờ, hoặc 1 chỉ số──→ nâng lên Trung bình
+        │        đã bất thường (SpO2 < 92 / nhiệt độ > 39)
         ↓
 Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
         """,

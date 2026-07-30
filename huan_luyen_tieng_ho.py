@@ -64,10 +64,14 @@ from health_core.audio import FEATURE_NAMES, extract_features_from_array
 
 from tieng_viet import bat_tieng_viet
 
-THU_MUC_AUDIO = "du_lieu_ho"
-FILE_NHAN = "nhan_tieng_ho.csv"
-FILE_MO_HINH = "mo_hinh_tieng_ho.joblib"
-FILE_KET_QUA = "ket_qua_tieng_ho.csv"
+# Neo vào thư mục chứa file này — app.py cũng chỉ tìm mo_hinh_tieng_ho.joblib
+# trong thư mục của nó, nên ghi theo đường dẫn tương đối trần thì huấn luyện
+# xong mà app vẫn báo "chưa có mô hình tiếng ho".
+THU_MUC = Path(__file__).resolve().parent
+THU_MUC_AUDIO = THU_MUC / "du_lieu_ho"
+FILE_NHAN = THU_MUC / "nhan_tieng_ho.csv"
+FILE_MO_HINH = THU_MUC / "mo_hinh_tieng_ho.joblib"
+FILE_KET_QUA = THU_MUC / "ket_qua_tieng_ho.csv"
 RANDOM_STATE = 42
 
 

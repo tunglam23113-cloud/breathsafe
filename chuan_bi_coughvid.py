@@ -35,9 +35,12 @@ import pandas as pd
 
 from tieng_viet import bat_tieng_viet
 
-FILE_METADATA = "metadata_compiled.csv"
-THU_MUC_AUDIO = "du_lieu_ho"
-FILE_NHAN = "nhan_tieng_ho.csv"
+# Neo vào thư mục chứa file này để nhan_tieng_ho.csv sinh ra đúng chỗ mà
+# huan_luyen_tieng_ho.py đi tìm, dù chạy script từ thư mục nào.
+THU_MUC = Path(__file__).resolve().parent
+FILE_METADATA = THU_MUC / "metadata_compiled.csv"
+THU_MUC_AUDIO = THU_MUC / "du_lieu_ho"
+FILE_NHAN = THU_MUC / "nhan_tieng_ho.csv"
 
 NGUONG_HO = 0.8  # chỉ lấy đoạn mà bộ dò của COUGHVID chắc chắn >=80% là tiếng ho
 CHAN_DOAN_BINH_THUONG = "healthy_cough"  # mọi chẩn đoán khác coi là bất thường
@@ -87,8 +90,8 @@ def tim_file_am_thanh(thu_muc: Path, uuid: str):
 def main():
     bat_tieng_viet()
 
-    meta_path = Path(FILE_METADATA)
-    thu_muc = Path(THU_MUC_AUDIO)
+    meta_path = FILE_METADATA
+    thu_muc = THU_MUC_AUDIO
 
     if not meta_path.exists():
         raise SystemExit(

@@ -34,6 +34,8 @@ Vì lý do trên, script này CỐ TÌNH làm dữ liệu khó hơn thay vì s�
 ================================================================================
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -47,6 +49,13 @@ from tieng_viet import bat_tieng_viet
 # Cố định số ngẫu nhiên → chạy lại luôn ra bộ dữ liệu y hệt.
 # Đây là yêu cầu "reproducibility" của nghiên cứu khoa học.
 RANDOM_STATE = 42
+
+# Ghi ra THƯ MỤC CHỨA FILE NÀY, không phải thư mục hiện hành. Chạy script từ một
+# thư mục khác mà ghi theo đường dẫn tương đối trần thì file dữ liệu rơi ra chỗ
+# khác, còn huan_luyen.py và app.py vẫn tìm trong thư mục của chúng — hai bên
+# lệch nhau mà không có lỗi nào báo ra.
+THU_MUC = Path(__file__).resolve().parent
+FILE_DU_LIEU = THU_MUC / "du_lieu_mo_phong.csv"
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +339,6 @@ if __name__ == "__main__":
     df = tao_bo_du_lieu(so_ca=2000)
     in_thong_ke(df)
 
-    df.to_csv("du_lieu_mo_phong.csv", index=False, encoding="utf-8-sig")
-    print("\nĐã lưu vào: du_lieu_mo_phong.csv")
+    df.to_csv(FILE_DU_LIEU, index=False, encoding="utf-8-sig")
+    print(f"\nĐã lưu vào: {FILE_DU_LIEU}")
     print("(Dùng encoding utf-8-sig để mở bằng Excel không bị lỗi font tiếng Việt.)")

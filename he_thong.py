@@ -10,8 +10,8 @@
        ↓                                          chuyển tuyến
     [LỚP 2] AI phân loại 3 mức
        ↓
-    [LỚP 3] Hậu kiểm ──AI nói Thấp nhưng có >= 2 dấu hiệu đáng ngờ──→ nâng lên
-       ↓                                                              Trung bình
+    [LỚP 3] Hậu kiểm ──AI nói Thấp nhưng có >= 2 dấu hiệu đáng ngờ, HOẶC có──→ nâng lên
+       ↓               một chỉ số đã bất thường (SpO2 < 92 / nhiệt độ > 39)   Trung bình
     Kết quả + giải thích
 
 Vì sao phải làm phức tạp thế, sao không để AI quyết hết?
@@ -113,6 +113,7 @@ class HeThongBreathSafe:
         # Ở một công cụ sàng lọc, "không biết" phải khác "bình thường". Thiếu
         # số đo thì từ chối trả lời, để người dùng đi đo lại.
         rong = []
+        so_da_doi = {}
         for ten in self.dac_trung:
             gia_tri = ca[ten]
             try:
@@ -122,12 +123,28 @@ class HeThongBreathSafe:
                 continue
             if so != so:  # NaN là giá trị duy nhất khác chính nó
                 rong.append(TEN_TIENG_VIET.get(ten, ten))
+                continue
+            # Số nguyên giữ nguyên là int để câu lý do in ra "SpO2 = 91%" chứ
+            # không phải "SpO2 = 91.0%" — người dùng đọc phiếu là nhân viên y tế,
+            # không phải lập trình viên.
+            so_da_doi[ten] = int(so) if so.is_integer() else so
         if rong:
             raise ValueError(
                 f"Các thông tin sau đang để trống hoặc không phải số: "
                 f"{', '.join(rong)}. Hệ thống không đoán thay khi thiếu số đo — "
                 f"hãy đo lại rồi nhập đầy đủ."
             )
+
+        # Từ đây trở xuống chỉ dùng `ca` đã ĐỔI SANG SỐ, không dùng dict gốc.
+        #
+        # Vì sao? Vì float("97") chạy được nhưng "97" < 90 thì KHÔNG — Python ném
+        # TypeError. Chuyện này xảy ra thật với trang Sàng lọc hàng loạt: chỉ cần
+        # MỘT ô trong cột spo2 ghi chữ ("khong do", "97%"...) là pandas đọc cả cột
+        # đó thành chuỗi, và khi ấy MỌI dòng — kể cả những dòng số liệu hoàn toàn
+        # đúng — đều chết với dòng lỗi vô nghĩa "'<' not supported between
+        # instances of 'str' and 'int'". Một ca SpO2 88% đáng cảnh báo đỏ bị ghi
+        # thành "LỖI" chỉ vì một dòng khác trong file gõ sai.
+        ca = {**ca, **so_da_doi}
 
         # --- LỚP 1: Quy tắc cảnh báo đỏ -------------------------------
         # Chạy TRƯỚC AI. Nếu trúng, kết luận CAO ngay và không cần hỏi AI.
@@ -236,9 +253,17 @@ def in_ket_qua(ket_qua, ca):
     else:
         print(f"Độ tin cậy: {ket_qua.do_tin_cay:.0%} (đã hiệu chuẩn)")
 
+    # Phân biệt hai chuyện khác nhau: "ca này lạ" và "không nên tin kết quả".
+    # Khi kết luận đến từ quy tắc y khoa thì AI không tham gia quyết định, nên nói
+    # "không nên tin kết quả" là nói sai — xem thêm KetQua.nen_tin_ai.
     if ket_qua.la_ca_la:
         print("\n*** CẢNH BÁO CA LẠ ***")
         print(ket_qua.ood.message)
+        if ket_qua.nen_tin_ai:
+            print(
+                "(Kết luận trên KHÔNG dựa vào AI mà dựa vào quy tắc y khoa, nên "
+                "cảnh báo này không làm giảm giá trị của kết luận.)"
+            )
 
     print("\nLý do:")
     for x in ket_qua.ly_do:

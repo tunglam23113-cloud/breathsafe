@@ -13,6 +13,8 @@ kiểm chứng, không nên bị "loãng" giữa 2.000 mẫu máy tự sinh.
 Script này CHỈ chạy được sau khi đã có phản hồi thật. Nó không tự bịa dữ liệu.
 """
 
+from pathlib import Path
+
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
@@ -22,8 +24,14 @@ from dac_trung import DAC_TRUNG
 from huan_luyen import chia_du_lieu, doc_du_lieu
 from tieng_viet import bat_tieng_viet
 
-FILE_MO_HINH = "mo_hinh_breathsafe.joblib"
-FILE_PHAN_HOI = "phan_hoi_bac_si.json"
+# Neo vào thư mục chứa file này — cùng lý do đã ghi trong app.py và huan_luyen.py.
+# Riêng ở đây còn nguy hơn: đọc phan_hoi_bac_si.json theo đường dẫn tương đối
+# trần, chạy script từ thư mục khác thì PhysicianFeedbackLoop thấy một file rỗng
+# và script kết luận "chưa có phản hồi nào" trong khi phản hồi vẫn nằm nguyên
+# cạnh app.py.
+THU_MUC = Path(__file__).resolve().parent
+FILE_MO_HINH = str(THU_MUC / "mo_hinh_breathsafe.joblib")
+FILE_PHAN_HOI = str(THU_MUC / "phan_hoi_bac_si.json")
 SO_CA_TOI_THIEU = 30  # không retrain khi chưa đủ, xem lý do bên dưới
 RANDOM_STATE = 42
 
@@ -72,7 +80,7 @@ def main():
     if so_bat_dong == 0:
         raise SystemExit(
             "\nChưa có ca bất đồng nào — không có gì để học.\n"
-            "Hãy dùng Trang 2 của app để thu thập phản hồi trước."
+            "Hãy dùng trang 'Phản hồi bác sĩ' của app để thu thập phản hồi trước."
         )
 
     if so_bat_dong < SO_CA_TOI_THIEU:
@@ -157,7 +165,7 @@ def main():
     # Lưu — nhưng KHÔNG ghi đè mô hình cũ
     # ------------------------------------------------------------------
     # Giữ lại mô hình cũ để có thể so sánh và quay lui nếu mô hình mới tệ hơn.
-    duong_dan = mo_hinh_moi.save("mo_hinh_breathsafe_moi.joblib")
+    duong_dan = mo_hinh_moi.save(str(THU_MUC / "mo_hinh_breathsafe_moi.joblib"))
     print(f"\nĐã lưu mô hình mới vào: {duong_dan}")
     print(
         "Mô hình CŨ vẫn được giữ nguyên. Nếu muốn dùng mô hình mới cho app, hãy\n"

@@ -23,10 +23,17 @@ from pathlib import Path
 
 from ca_kinh_dien import CA_KINH_DIEN
 from dac_trung import TEN_TIENG_VIET
-from quy_tac import nguong_tho_nhanh_nguy_hiem, nhip_tho_binh_thuong
+from quy_tac import (
+    nguong_tho_hoi_nhanh,
+    nguong_tho_nhanh_nguy_hiem,
+    nhip_tho_binh_thuong,
+)
 from tieng_viet import bat_tieng_viet
 
-THU_MUC = Path("ho_so")
+# ho_so/ phải nằm cạnh CHÍNH FILE NÀY, không phải trong thư mục hiện hành. Với
+# Path("ho_so") trần, chạy script từ nơi khác sẽ tạo một thư mục ho_so/ thứ hai ở
+# đó — rồi bản đã ký nằm một chỗ, phiếu mới sinh ra nằm chỗ khác.
+THU_MUC = Path(__file__).resolve().parent / "ho_so"
 
 # Mốc tuổi để in bảng. Hai hàm ngưỡng chia nhóm tuổi KHÁC NHAU, nên mỗi bảng
 # phải có danh sách mốc riêng — dùng chung một danh sách thì nhãn dòng sẽ nói
@@ -58,7 +65,7 @@ def bang_nhip_tho(ham, tieu_de, moc_tuoi):
 def phieu_bo_quy_tac():
     """Phiếu duyệt bộ quy tắc cảnh báo đỏ."""
     nguong_nl = nguong_tho_nhanh_nguy_hiem(30)      # ngưỡng báo động của người lớn
-    chu_y_nl = nhip_tho_binh_thuong(30) + 6         # ngưỡng "hơi nhanh" của người lớn
+    chu_y_nl = nguong_tho_hoi_nhanh(30)             # ngưỡng "hơi nhanh" của người lớn
     return f"""# PHIẾU DUYỆT CHUYÊN MÔN — BỘ QUY TẮC CẢNH BÁO ĐỎ
 
 **Đề tài:** BreathSafe — Trợ lý AI hỗ trợ nhân viên y tế tuyến xã sàng lọc sớm
@@ -121,7 +128,7 @@ hệ thống tự nâng lên mức **Trung bình** cho an toàn.
 
 | # | Dấu hiệu | Bác sĩ đồng ý? |
 |:-:|---|:-:|
-| 1 | SpO2 trong khoảng 92–94% | ☐ Đồng ý ☐ Không |
+| 1 | SpO2 dưới 95% mà chưa trúng quy tắc cảnh báo đỏ ở PHẦN 1 | ☐ Đồng ý ☐ Không |
 | 2 | Nhịp thở vượt mức bình thường của tuổi **cộng 6** (người lớn: > {chu_y_nl}) | ☐ Đồng ý ☐ Không |
 | 3 | Nhiệt độ > 38.5°C | ☐ Đồng ý ☐ Không |
 | 4 | Có bệnh nền | ☐ Đồng ý ☐ Không |
@@ -135,11 +142,39 @@ hệ thống tự nâng lên mức **Trung bình** cho an toàn.
 
 ---
 
+## PHẦN 2B — Chỉ số bất thường ĐƠN ĐỘC cũng không được xếp mức Thấp
+
+Hai chỉ số dưới đây, dù đứng **một mình** (không kèm dấu hiệu nào khác) và **không
+trúng** quy tắc cảnh báo đỏ nào ở PHẦN 1, vẫn khiến hệ thống nâng từ Thấp lên
+**Trung bình**. Ngưỡng ở đây **không phải ngưỡng mới** — đúng bằng ngưỡng đã dùng
+ở PHẦN 1 (quy tắc 2 và quy tắc 6).
+
+| # | Chỉ số | Vì sao cháu đưa vào | Bác sĩ đồng ý? |
+|:-:|---|---|:-:|
+| 1 | SpO2 < 92% | Trước đây một ca SpO2 90%, người 30 tuổi, không khó thở bị hệ thống xếp mức **Thấp** — trong khi thẻ chỉ số trên màn hình vẫn tô đỏ "Bất thường" | ☐ Đồng ý ☐ Không |
+| 2 | Nhiệt độ > 39°C | Trước đây một ca sốt **42°C** mà mọi chỉ số khác bình thường bị xếp mức **Thấp**, vì quy tắc 6 ở PHẦN 1 còn đòi thêm "bệnh > 3 ngày" **và** "mệt nhiều" | ☐ Đồng ý ☐ Không |
+
+Mục này chỉ nâng lên **Trung bình** ("nên được nhân viên y tế khám trong hôm nay"),
+**không** nâng lên Cao — vì thiếu dấu hiệu đi kèm nên chưa đủ căn cứ báo động đỏ.
+
+**Bác sĩ có thấy chỉ số nào khác cũng nên nằm trong danh sách này không?** (ví dụ
+nhịp thở, hay SpO2 nên là < 94% thay vì < 92%?)
+
+.....................................................................................
+
+.....................................................................................
+
+---
+
 ## PHẦN 3A — Bảng nhịp thở BÌNH THƯỜNG theo tuổi
 
 Hệ thống dùng bảng này để biết một người thở nhanh hay không (trẻ nhỏ thở nhanh
 hơn người lớn là bình thường). Một ca bị coi là "hơi nhanh" (PHẦN 2, mục 2) khi
-vượt con số này **cộng 6**.
+vượt con số này **cộng 6** — nhưng ngưỡng "hơi nhanh" luôn được kẹp để **thấp hơn
+ngưỡng báo động đỏ** ở PHẦN 3B. Phần kẹp này chỉ ảnh hưởng đúng mốc **5 tuổi**
+(bình thường 25, cộng 6 là 31, trong khi ngưỡng báo động của tuổi này chỉ là 30 —
+nên ngưỡng chú ý được hạ về 29). Không có phần kẹp thì trẻ 5 tuổi không bao giờ
+lọt vào dải "cần chú ý".
 
 {bang_nhip_tho(nhip_tho_binh_thuong, "Nhịp thở bình thường (lần/phút)", MOC_BINH_THUONG)}
 

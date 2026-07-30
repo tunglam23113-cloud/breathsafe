@@ -12,7 +12,8 @@ Hệ thống có 3 lớp:
     Lớp 1 (file này): Quy tắc cảnh báo đỏ → nếu trúng thì CAO ngay lập tức
     Lớp 2 (mô hình):  AI phân loại 3 mức
     Lớp 3 (file này): Hậu kiểm — nếu AI nói THẤP nhưng có >= 2 dấu hiệu đáng
-                      ngờ thì nâng lên TRUNG BÌNH
+                      ngờ, HOẶC có một chỉ số đã ở mức bất thường (SpO2 < 92,
+                      nhiệt độ > 39), thì nâng lên TRUNG BÌNH
 
 QUAN TRỌNG: Bộ quy tắc này phải được BÁC SĨ DUYỆT VÀ KÝ XÁC NHẬN trước khi dùng.
 Em không tự nghĩ ra các ngưỡng này — em lấy từ tài liệu y khoa và hỏi bác sĩ.
@@ -73,6 +74,33 @@ def nguong_tho_nhanh_nguy_hiem(tuoi):
     return 30
 
 
+def nguong_tho_hoi_nhanh(tuoi):
+    """Ngưỡng nhịp thở "HƠI nhanh" — chưa báo động đỏ nhưng đáng chú ý (lớp 3).
+
+    Công thức: mức bình thường của tuổi đó CỘNG 6, nhưng luôn phải nằm THẤP HƠN
+    ngưỡng báo động đỏ của cùng tuổi đó.
+
+    Vì sao cần phần kẹp (`min`)? Vì hai bảng tra chia nhóm tuổi KHÁC NHAU, nên ở
+    đúng mốc 5 tuổi chúng chồng chéo ngược nhau:
+
+        trẻ 5 tuổi: bình thường 25 → "hơi nhanh" = 25 + 6 = 31
+                    nhưng ngưỡng BÁO ĐỘNG ĐỎ của tuổi này chỉ là 30
+
+    Tức là ngưỡng "hơi nhanh" còn CAO HƠN ngưỡng báo động — dải "Cần chú ý" của
+    trẻ 5 tuổi rỗng hoàn toàn. Hậu quả đo được: một bé 5 tuổi thở 30 lần/phút
+    (bình thường của tuổi này là 25) KHÔNG trúng quy tắc đỏ (cần > 30) và cũng
+    KHÔNG được đếm là dấu hiệu đáng ngờ (cần > 31) — nên lớp hậu kiểm không nhìn
+    thấy nó, còn thẻ chỉ số trên màn hình tô XANH "Bình thường".
+
+    Với mọi lứa tuổi khác, phần kẹp không đổi gì: người từ 12 tuổi vẫn là 22,
+    nhũ nhi vẫn 46, trẻ 1–2 tuổi vẫn 36, trẻ 3–4 tuổi vẫn 31, trẻ 6–11 tuổi vẫn 26.
+    """
+    return min(
+        nhip_tho_binh_thuong(tuoi) + 6,
+        nguong_tho_nhanh_nguy_hiem(tuoi) - 1,
+    )
+
+
 # ---------------------------------------------------------------------------
 # LỚP 1 — CÁC QUY TẮC CẢNH BÁO ĐỎ
 # ---------------------------------------------------------------------------
@@ -104,11 +132,21 @@ def kiem_tra_canh_bao_do(ca):
     # trúng cả hai điều kiện, và bản trước in ra hai dòng lý do gần trùng nhau
     # ("SpO2 88% kèm khó thở" + "SpO2 88% rất thấp"), làm loãng phần giải thích.
     if ca["spo2"] < 90:
-        them = " kèm khó thở" if ca["dyspnea"] == 1 else ""
-        ly_do.append(
-            f"SpO2 = {ca['spo2']}% rất thấp (dưới 90%){them} → nguy hiểm kể cả "
-            f"khi bệnh nhân chưa thấy khó thở"
-        )
+        # Phần đuôi câu phải đổi theo ca. Bản trước luôn ghi "nguy hiểm kể cả khi
+        # bệnh nhân chưa thấy khó thở" ngay cả khi vừa ghi "kèm khó thở" ở đầu
+        # câu, nên dòng lý do tự nói ngược chính nó ngay trên màn hình và trên
+        # phiếu in: "SpO2 = 88% rất thấp (dưới 90%) kèm khó thở → nguy hiểm kể
+        # cả khi bệnh nhân chưa thấy khó thở".
+        if ca["dyspnea"] == 1:
+            ly_do.append(
+                f"SpO2 = {ca['spo2']}% rất thấp (dưới 90%) kèm khó thở "
+                f"→ dấu hiệu suy hô hấp nặng"
+            )
+        else:
+            ly_do.append(
+                f"SpO2 = {ca['spo2']}% rất thấp (dưới 90%) → nguy hiểm kể cả "
+                f"khi bệnh nhân chưa thấy khó thở"
+            )
     elif ca["spo2"] < 92 and ca["dyspnea"] == 1:
         ly_do.append(
             f"SpO2 = {ca['spo2']}% (dưới ngưỡng 92%) kèm khó thở "
@@ -173,15 +211,34 @@ def dem_dau_hieu_dang_ngo(ca):
     """
     dau_hieu = []
 
-    if 92 <= ca["spo2"] < 95:
-        dau_hieu.append(f"SpO2 = {ca['spo2']}% hơi thấp (bình thường >= 95%)")
+    # Điều kiện là spo2 < 95, KHÔNG phải 92 <= spo2 < 95.
+    #
+    # Bản trước bỏ trống khoảng 90–91%, và chỉ khoảng đó thôi: SpO2 dưới 90% thì
+    # quy tắc cảnh báo đỏ đã bắt, SpO2 90–91% KÈM khó thở cũng bị quy tắc 1b bắt,
+    # nhưng SpO2 90–91% mà KHÔNG khó thở thì không trúng quy tắc nào — và cũng
+    # không được đếm là dấu hiệu đáng ngờ. Hậu quả là thang đánh giá bị NGƯỢC:
+    #
+    #     SpO2 93% + sốt 38.6°C  →  2 dấu hiệu  →  hậu kiểm nâng lên Trung bình
+    #     SpO2 91% + sốt 38.6°C  →  1 dấu hiệu  →  vẫn để nguyên mức Thấp
+    #
+    # Bệnh nhân thiếu oxy NẶNG HƠN lại được xếp nhẹ hơn. Đó đúng là loại sai mà
+    # lớp hậu kiểm được dựng ra để chặn.
+    if ca["spo2"] < 95:
+        if ca["spo2"] < 92:
+            dau_hieu.append(
+                f"SpO2 = {ca['spo2']}% thấp (dưới ngưỡng 92%), chưa kèm khó thở "
+                f"nên chưa trúng quy tắc cảnh báo đỏ"
+            )
+        else:
+            dau_hieu.append(f"SpO2 = {ca['spo2']}% hơi thấp (bình thường >= 95%)")
 
-    # Ngưỡng "hơi nhanh" = mức bình thường CỦA TUỔI ĐÓ cộng 6.
+    # Ngưỡng "hơi nhanh" = mức bình thường CỦA TUỔI ĐÓ cộng 6, có kẹp để không
+    # bao giờ vượt ngưỡng báo động đỏ của cùng tuổi — xem nguong_tho_hoi_nhanh().
     # Với người từ 12 tuổi: 16 + 6 = 22, đúng bằng ngưỡng cũ nên người lớn không
     # đổi gì. Nhưng bản cũ dùng số 22 cố định cho mọi lứa tuổi, nên 98% trẻ dưới
     # 6 tuổi có nhãn nguy cơ THẤP vẫn bị gắn cờ "thở nhanh", và 48% trong số đó
     # bị lớp hậu kiểm nâng oan từ Thấp lên Trung bình.
-    nguong_chu_y = nhip_tho_binh_thuong(ca["age"]) + 6
+    nguong_chu_y = nguong_tho_hoi_nhanh(ca["age"])
     if ca["respiratory_rate"] > nguong_chu_y:
         dau_hieu.append(
             f"Nhịp thở {ca['respiratory_rate']} lần/phút hơi nhanh "
@@ -202,11 +259,58 @@ def dem_dau_hieu_dang_ngo(ca):
     return dau_hieu
 
 
+def dau_hieu_nang_don_doc(ca):
+    """Các chỉ số đã ở MỨC BẤT THƯỜNG mà một mình nó cũng không được bỏ qua.
+
+    Vì sao cần hàm này?
+    -------------------
+    Lớp hậu kiểm cũ chỉ nâng mức khi có TỪ 2 dấu hiệu đáng ngờ trở lên. Nhưng
+    một chỉ số bất thường nặng mà đứng MỘT MÌNH thì chỉ được đếm là 1 dấu hiệu,
+    nên không đủ để nâng — và nếu bộ quy tắc cảnh báo đỏ cũng không bắt được thì
+    AI được toàn quyền kết luận ca đó AN TOÀN. Đúng cái điều mà nguyên tắc cốt
+    lõi của hệ thống nói KHÔNG BAO GIỜ được phép xảy ra.
+
+    Hai ca đo được thật, trên đúng mô hình đang chạy:
+
+        Nhiệt độ 42.0°C, mọi thứ khác bình thường  →  hệ thống kết luận "Thấp"
+        SpO2 90%, người 30 tuổi, không khó thở      →  hệ thống kết luận "Thấp"
+
+    Với 42°C thì quy tắc cảnh báo đỏ số 5 không bắt (nó còn đòi thêm "bệnh > 3
+    ngày" VÀ "mệt nhiều"), còn hậu kiểm chỉ đếm được 1 dấu hiệu. Trên màn hình,
+    thẻ chỉ số ghi "Nhiệt độ 42.0°C — Bất thường" màu ĐỎ ngay bên cạnh dòng chữ
+    "Nguy cơ THẤP" màu XANH: hai kết luận trái ngược nhau trên cùng một khung.
+
+    Hai ngưỡng dùng ở đây KHÔNG phải ngưỡng mới: chúng đúng bằng ngưỡng đã có
+    trong PHẦN 1 của phiếu duyệt (SpO2 < 92 ở quy tắc 2, nhiệt độ > 39 ở quy tắc
+    6) — cũng chính là hai ngưỡng khiến thẻ chỉ số trên màn hình chuyển sang màu
+    đỏ "Bất thường". Nhờ vậy màu của thẻ chỉ số và mức nguy cơ không bao giờ còn
+    nói ngược nhau, mà không phải tự nghĩ ra con số y khoa nào mới.
+
+    Đây CHỈ nâng lên Trung bình ("cần nhân viên y tế xem trong hôm nay"), KHÔNG
+    nâng lên Cao — vì thiếu các dấu hiệu đi kèm nên chưa đủ căn cứ báo động đỏ.
+
+    Trả về danh sách mô tả; danh sách rỗng nghĩa là không có dấu hiệu nào loại này.
+    """
+    nang = []
+    if ca["spo2"] < 92:
+        nang.append(
+            f"SpO2 = {ca['spo2']}% đã dưới ngưỡng 92% — không được xếp mức Thấp "
+            f"dù chưa có dấu hiệu nào khác"
+        )
+    if ca["temperature"] > 39:
+        nang.append(
+            f"Nhiệt độ {ca['temperature']}°C là sốt cao (trên 39°C) — không được "
+            f"xếp mức Thấp dù chưa có dấu hiệu nào khác"
+        )
+    return nang
+
+
 def hau_kiem(muc_ai, ca):
     """Lớp an toàn cuối: không cho AI nói "Thấp" quá dễ dàng.
 
-    Nếu AI nói THẤP nhưng ca có từ 2 dấu hiệu đáng ngờ trở lên, nâng lên
-    TRUNG BÌNH.
+    Nâng lên TRUNG BÌNH khi AI nói THẤP mà ca thuộc một trong hai trường hợp:
+        1. Có TỪ 2 dấu hiệu đáng ngờ trở lên (dem_dau_hieu_dang_ngo), hoặc
+        2. Có ÍT NHẤT MỘT chỉ số đã ở mức bất thường nặng (dau_hieu_nang_don_doc)
 
     Vì sao? Vì trong y khoa, sai lầm bỏ sót nguy hiểm hơn nhiều so với báo động
     giả. Nâng một ca từ Thấp lên Trung bình chỉ khiến nhân viên y tế nhìn kỹ
@@ -221,6 +325,15 @@ def hau_kiem(muc_ai, ca):
     """
     if muc_ai != 0:
         return muc_ai, None  # AI đã nói Trung bình hoặc Cao rồi, không cần can thiệp
+
+    nang_don_doc = dau_hieu_nang_don_doc(ca)
+    if nang_don_doc:
+        ly_do = (
+            "AI đánh giá mức Thấp, nhưng có chỉ số đã ở mức bất thường nên hệ "
+            "thống nâng lên mức Trung bình cho an toàn: "
+            + "; ".join(nang_don_doc)
+        )
+        return 1, ly_do
 
     dau_hieu = dem_dau_hieu_dang_ngo(ca)
     if len(dau_hieu) >= 2:
@@ -276,9 +389,13 @@ class MoHinhChiQuyTac:
             ca = self._thanh_dict(hang)
             if kiem_tra_canh_bao_do(ca):
                 ket_qua.append(2)  # trúng cảnh báo đỏ → Cao
-            elif len(dem_dau_hieu_dang_ngo(ca)) >= 2:
-                ket_qua.append(1)  # có vài dấu hiệu → Trung bình
             else:
-                ket_qua.append(0)  # không có gì → Thấp
+                # Dùng ĐÚNG hau_kiem() của lớp 3 thay vì chép lại điều kiện
+                # "len(...) >= 2" ở đây. Bản trước chép tay, nên khi lớp 3 học
+                # thêm cách nâng mức mới (dấu hiệu nặng đơn độc) thì baseline này
+                # vẫn dùng luật cũ — hai chỗ lệch nhau mà không có lỗi nào báo ra,
+                # và bảng so sánh mô hình trong báo cáo thành so sánh sai.
+                muc, _ = hau_kiem(0, ca)
+                ket_qua.append(muc)
 
         return np.array(ket_qua)

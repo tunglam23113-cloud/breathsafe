@@ -377,8 +377,12 @@ CA_KINH_DIEN = [
         "name": "Viêm phế quản cấp ở trẻ nhỏ (đối chứng âm 5)",
         "description": "Bé 18 tháng, ho có đờm, sốt 38.0°C, chơi bình thường, "
                        "ăn bú tốt, SpO2 97%, không rút lõm lồng ngực.",
+        # age = 1 vì cột "age" tính bằng NĂM TRÒN (18 tháng → 1), đúng quy ước đã
+        # dùng ở TC12 (8 tháng → 0). Bản trước ghi 2, lệch với phần mô tả.
+        # Ngưỡng nhịp thở của 1 tuổi và 2 tuổi giống nhau (cùng nhóm dưới 3 tuổi)
+        # nên kết luận không đổi — sửa để số liệu và mô tả nói cùng một điều.
         "input": {
-            "age": 2, "fever": 1, "temperature": 38.0, "cough": 1,
+            "age": 1, "fever": 1, "temperature": 38.0, "cough": 1,
             "dyspnea": 0, "spo2": 97, "respiratory_rate": 30,
             "chest_pain": 0, "fatigue": 0, "days_sick": 3, "comorbidity": 0,
         },

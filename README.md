@@ -114,7 +114,8 @@ Người bệnh đến trạm y tế
         ↓                                       khuyến cáo chuyển tuyến
 [LỚP 2] AI phân loại 3 mức (Random Forest đã hiệu chuẩn)
         ↓
-[LỚP 3] Hậu kiểm ──AI nói Thấp mà có ≥2 dấu hiệu đáng ngờ──→ nâng lên Trung bình
+[LỚP 3] Hậu kiểm ──AI nói Thấp mà có ≥2 dấu hiệu đáng ngờ, hoặc 1 chỉ số──→ nâng lên Trung bình
+        │        đã bất thường (SpO2 < 92 / nhiệt độ > 39)
         ↓
 Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
 ```
@@ -131,11 +132,11 @@ Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
 
 | Mô hình | Recall (Cao) | Bỏ sót (Cao) | F1 macro | ECE | Accuracy |
 |---|---:|---:|---:|---:|---:|
-| Chỉ Rule Engine | 0.850 | 0.150 | 0.747 | — | 0.750 |
+| Chỉ Rule Engine | 0.850 | 0.150 | 0.768 | — | 0.770 |
 | Logistic Regression | 0.817 | 0.183 | 0.808 | 0.029 | 0.823 |
 | Decision Tree | 0.917 | 0.083 | 0.862 | 0.021 | 0.857 |
 | Chỉ AI (RF + hiệu chuẩn) | 0.917 | 0.083 | **0.903** | **0.017** | **0.903** |
-| **HỆ THỐNG ĐẦY ĐỦ** | **0.967** | **0.033** | 0.794 | — | 0.787 |
+| **HỆ THỐNG ĐẦY ĐỦ** | **0.967** | **0.033** | 0.792 | — | 0.783 |
 
 **Bộ 20 ca kinh điển:** chỉ AI đạt 15/20 → hệ thống đầy đủ đạt **18/20** (vượt mục tiêu 17/20). Rule Engine bắt được 3 ca mà AI bỏ sót.
 
@@ -144,7 +145,7 @@ Hai ca hệ thống vẫn bỏ sót là **TC16** (ngộ độc khí CO — máy 
 ### Hai câu giám khảo chắc chắn sẽ hỏi về bảng này
 
 **"Vì sao hệ thống đầy đủ có Accuracy THẤP HƠN chỉ dùng AI?"**
-Vì Rule Engine cố tình đẩy nhiều ca lên mức Cao. Nó đánh đổi: bắt được nhiều ca nguy hiểm hơn (Recall 0.917 → 0.967) nhưng báo động giả nhiều hơn (Accuracy 0.903 → 0.787). Đây là **lựa chọn có chủ ý**, không phải lỗi. Bỏ sót một ca viêm phổi nặng có thể khiến một người chết; một báo động giả chỉ tốn của nhân viên y tế vài phút xem lại. Đề tài tối ưu Recall, không tối ưu Accuracy.
+Vì Rule Engine cố tình đẩy nhiều ca lên mức Cao. Nó đánh đổi: bắt được nhiều ca nguy hiểm hơn (Recall 0.917 → 0.967) nhưng báo động giả nhiều hơn (Accuracy 0.903 → 0.783). Đây là **lựa chọn có chủ ý**, không phải lỗi. Bỏ sót một ca viêm phổi nặng có thể khiến một người chết; một báo động giả chỉ tốn của nhân viên y tế vài phút xem lại. Đề tài tối ưu Recall, không tối ưu Accuracy.
 
 **"Vì sao cột ECE của Rule Engine và hệ thống đầy đủ để trống?"**
 Vì hai mô hình đó không đưa ra xác suất. Khi Rule Engine kết luận "SpO2 = 88% kèm khó thở là nguy hiểm", đó là một quyết định y khoa dứt khoát, không phải con số xác suất — nên không có gì để hiệu chuẩn.
@@ -194,7 +195,7 @@ Câu trả lời mẫu khi bị hỏi **"health-core là thư viện của ai? E
 >
 > *Phần em tự làm và chịu trách nhiệm hoàn toàn là: bộ quy tắc cảnh báo đỏ, kiến trúc 3 lớp an toàn, bộ 20 ca lâm sàng kinh điển, cách sinh dữ liệu, giao diện, và việc ghép tất cả lại. Nếu thầy cô muốn hỏi em bất kỳ dòng nào trong những phần đó, em xin trả lời ạ."*
 
-Nếu bị hỏi tiếp **"vậy em có hiểu calibration là gì không?"** — cháu phải trả lời được, và câu trả lời có sẵn ở Trang 4 của app. Dùng thư viện mà không hiểu thì mới đáng trách; dùng thư viện của người khác mà hiểu rõ mình đang dùng gì thì hoàn toàn bình thường.
+Nếu bị hỏi tiếp **"vậy em có hiểu calibration là gì không?"** — cháu phải trả lời được, và câu trả lời có sẵn ở trang **Về hệ thống** của app. Dùng thư viện mà không hiểu thì mới đáng trách; dùng thư viện của người khác mà hiểu rõ mình đang dùng gì thì hoàn toàn bình thường.
 
 ### Vì sao phải khai thật
 

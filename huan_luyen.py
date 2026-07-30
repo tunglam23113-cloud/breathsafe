@@ -14,6 +14,8 @@ Toàn bộ phần tính toán khó nằm trong thư viện health-core (cài b�
 pip install health-core). File này chỉ ghép các bước lại theo đúng thứ tự.
 """
 
+from pathlib import Path
+
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
@@ -34,9 +36,18 @@ from tieng_viet import bat_tieng_viet
 
 RANDOM_STATE = 42  # cố định để chạy lại ra kết quả y hệt
 
+# Mọi đường dẫn neo vào THƯ MỤC CHỨA FILE NÀY, không phải thư mục hiện hành —
+# cùng lý do đã ghi trong app.py. Trước đây chạy `python D:\...\huan_luyen.py`
+# từ một thư mục khác thì script báo "không tìm thấy du_lieu_mo_phong.csv" dù
+# file nằm ngay cạnh, và nếu có dữ liệu thì nó rải mô hình cùng các file kết quả
+# ra thư mục hiện hành — app.py lại chỉ đọc trong thư mục của chính nó, nên app
+# vẫn dùng mô hình cũ mà không có lỗi nào báo ra.
+THU_MUC = Path(__file__).resolve().parent
 
-def doc_du_lieu(duong_dan="du_lieu_mo_phong.csv"):
+
+def doc_du_lieu(duong_dan=None):
     """Đọc file CSV. Báo lỗi rõ ràng nếu chưa sinh dữ liệu."""
+    duong_dan = THU_MUC / "du_lieu_mo_phong.csv" if duong_dan is None else Path(duong_dan)
     try:
         return pd.read_csv(duong_dan)
     except FileNotFoundError:
@@ -154,7 +165,7 @@ def main():
         y_test,
     )
     print(bang.to_string(index=False))
-    bang.to_csv("ket_qua_so_sanh.csv", index=False, encoding="utf-8-sig")
+    bang.to_csv(THU_MUC / "ket_qua_so_sanh.csv", index=False, encoding="utf-8-sig")
     print("\n  Đã lưu bảng vào: ket_qua_so_sanh.csv")
 
     print("\n  CÁCH ĐỌC BẢNG NÀY — giám khảo sẽ hỏi hai câu sau:")
@@ -209,7 +220,8 @@ def main():
 
     try:
         plot_reliability_diagram(
-            y_test_cao, prob_truoc, prob_sau, save_path="reliability_diagram.png"
+            y_test_cao, prob_truoc, prob_sau,
+            save_path=str(THU_MUC / "reliability_diagram.png"),
         )
         print("  Đã lưu biểu đồ: reliability_diagram.png")
     except ImportError:
@@ -235,7 +247,9 @@ def main():
     ket_qua_ca = evaluate_textbook_cases(
         he_thong, CA_KINH_DIEN, DAC_TRUNG, verbose=True
     )
-    ket_qua_ca.to_csv("ket_qua_ca_kinh_dien.csv", index=False, encoding="utf-8-sig")
+    ket_qua_ca.to_csv(
+        THU_MUC / "ket_qua_ca_kinh_dien.csv", index=False, encoding="utf-8-sig"
+    )
     print("\nĐã lưu vào: ket_qua_ca_kinh_dien.csv")
 
     # Dùng len(CA_KINH_DIEN) chứ không gõ cứng "20": thêm hay bớt một ca là
@@ -252,7 +266,11 @@ def main():
     # Lưu lại cả hai con số để README và báo cáo trích đúng, không phải chép tay.
     pd.DataFrame(
         [{"so_ca": n_ca, "khop_chi_ai": khop_ai, "khop_he_thong_day_du": khop_day_du}]
-    ).to_csv("ket_qua_ca_kinh_dien_tong_hop.csv", index=False, encoding="utf-8-sig")
+    ).to_csv(
+        THU_MUC / "ket_qua_ca_kinh_dien_tong_hop.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
 
     if not da_duyet_hop_le():
         print(
@@ -264,7 +282,7 @@ def main():
     # ------------------------------------------------------------------
     # BƯỚC 7: Lưu mô hình
     # ------------------------------------------------------------------
-    duong_dan = mo_hinh_breathsafe.save("mo_hinh_breathsafe.joblib")
+    duong_dan = mo_hinh_breathsafe.save(str(THU_MUC / "mo_hinh_breathsafe.joblib"))
     print(f"\n[BƯỚC 7] Đã lưu mô hình vào: {duong_dan}")
 
     print("\n  Các thông tin mô hình dựa vào nhiều nhất (feature importance):")
