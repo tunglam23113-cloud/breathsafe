@@ -55,7 +55,14 @@ def tim_trinh_duyet():
 
 
 def khoi_dong_streamlit():
-    """Chạy Streamlit ngầm. Trả về tiến trình để sau này tắt đi."""
+    """Chạy Streamlit ngầm. Trả về tiến trình để sau này tắt đi.
+
+    `--server.address 127.0.0.1` là BẮT BUỘC, không phải tuỳ chọn cho gọn.
+    Mặc định Streamlit lắng nghe trên MỌI card mạng (0.0.0.0), nên nó in ra cả
+    "Network URL" và "External URL" — tức là bất cứ ai trong cùng mạng LAN (và
+    nếu router có mở cổng thì cả ngoài Internet) đều mở được app, nhập ca bệnh,
+    và đọc trang Lịch sử ca của phiên đang chạy.
+    """
     return subprocess.Popen(
         [
             sys.executable,
@@ -65,6 +72,8 @@ def khoi_dong_streamlit():
             "app.py",
             "--server.port",
             str(CONG),
+            "--server.address",
+            "127.0.0.1",
             "--server.headless",
             "true",
             "--browser.gatherUsageStats",

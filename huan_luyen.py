@@ -2,13 +2,15 @@
 
 Chạy:  python huan_luyen.py
 
-Script này làm 6 việc, đúng theo phương pháp trong kế hoạch:
+Script này làm 7 việc, đúng theo phương pháp trong kế hoạch — và đúng theo thứ tự
+các dòng "[BƯỚC n]" mà nó in ra khi chạy:
     1. Đọc dữ liệu và chia 70% train / 15% validation / 15% test
-    2. Huấn luyện 4 mô hình để so sánh
-    3. So sánh chúng bằng bảng chỉ số
-    4. Đo mức độ hiệu chuẩn (ECE) trước và sau khi hiệu chuẩn
-    5. Kiểm tra trên bộ 20 ca lâm sàng kinh điển
-    6. Lưu mô hình tốt nhất ra file
+    2. Huấn luyện 4 mô hình để so sánh, rồi ghép hệ thống 3 lớp đầy đủ
+    3. So sánh cả 5 bằng bảng chỉ số trên tập test
+    4. Cross-validation 5 fold để xem kết quả có ổn định không
+    5. Đo mức độ hiệu chuẩn (ECE) trước và sau khi hiệu chuẩn
+    6. Kiểm tra trên bộ 20 ca lâm sàng kinh điển
+    7. Lưu mô hình ra file
 
 Toàn bộ phần tính toán khó nằm trong thư viện health-core (cài bằng
 pip install health-core). File này chỉ ghép các bước lại theo đúng thứ tự.

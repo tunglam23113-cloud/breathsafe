@@ -1,0 +1,18 @@
+[theme]
+base = "light"
+primaryColor = "#0F766E"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F8FAFC"
+textColor = "#0F172A"
+font = "sans serif"
+
+[server]
+headless = true
+
+# Chỉ lắng nghe trên chính máy này. Mặc định Streamlit mở trên mọi card mạng
+# (0.0.0.0) và in ra "Network URL" + "External URL" — khi đó người khác trong
+# cùng mạng LAN mở được app và đọc được trang Lịch sử ca. Đây là dữ liệu sức
+# khoẻ, và README cam kết "dữ liệu lưu trong máy local".
+# chay_desktop.py cũng truyền --server.address 127.0.0.1 để lệnh chạy đúng kể
+# cả khi thiếu file config này.
+address = "localhost"

@@ -29,6 +29,20 @@ import numpy as np
 TAN_SO_MAU = 22050  # số mẫu mỗi giây; librosa mặc định dùng giá trị này
 
 
+def mo_ta_loi(loi: BaseException) -> str:
+    """Mô tả một ngoại lệ thành chuỗi LUÔN có nội dung.
+
+    Vì sao cần? Vì đúng cái lỗi hay gặp nhất ở đây lại có `str()` RỖNG:
+    `audioread.exceptions.NoBackendError` — lỗi được ném ra khi máy chưa cài
+    ffmpeg, tức là ca hỏng phổ biến nhất với file .m4a/.webm. Bản trước nhét
+    thẳng exception vào f-string, nên câu báo lỗi kết thúc bằng
+    "Chi tiết: Format not recognised. / " — vế quan trọng nhất trống trơn, trông
+    như câu bị cắt giữa dòng và không nói được máy đang thiếu gì.
+    """
+    noi_dung = str(loi).strip()
+    return f"{type(loi).__name__}: {noi_dung}" if noi_dung else type(loi).__name__
+
+
 def co_micro() -> bool:
     """Máy có thiết bị thu âm (micro) không?
 
@@ -108,7 +122,8 @@ def doc_file(du_lieu_bytes: bytes, ten_file: str = ""):
         raise ValueError(
             f"không giải mã được định dạng này ({duoi or 'không rõ đuôi'}). "
             f"Hãy đổi sang .wav, hoặc cài ffmpeg rồi thử lại "
-            f"(winget install Gyan.FFmpeg). Chi tiết: {loi_soundfile} / {loi_librosa}"
+            f"(winget install Gyan.FFmpeg). Chi tiết: "
+            f"{mo_ta_loi(loi_soundfile)} / {mo_ta_loi(loi_librosa)}"
         ) from loi_librosa
     finally:
         if tep_tam:

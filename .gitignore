@@ -1,6 +1,25 @@
 __pycache__
 ho_so
 .trinh_duyet_data
-.streamlit
 docs
 du_lieu_ho
+
+# Cấu hình giao diện PHẢI được đưa lên repo. Trước đây dòng này ghi cả thư mục
+# `.streamlit`, nên bản clone từ GitHub mất luôn `config.toml` — và mất theme
+# sáng (base = "light"). Khi đó Streamlit chạy theo theme của hệ điều hành: máy
+# nào đang dùng chế độ tối sẽ render chữ màu sáng, trong khi app tự vẽ nhiều
+# khối HTML có nền sáng cố định (#F0FDFA của .bs-nguon, #FEF2F2/#FFFBEB/#F0FDF4
+# của thẻ chỉ số) mà không đặt màu chữ — chữ sáng trên nền sáng là không đọc
+# được. Chỉ loại trừ file bí mật, không loại trừ cả thư mục.
+.streamlit/secrets.toml
+
+# Phản hồi của nhân viên y tế: mỗi dòng chứa TOÀN BỘ chỉ số sinh tồn của một ca
+# đã sàng lọc, kèm lý do chuyên môn viết tay và mã người phản hồi. Đây là dữ
+# liệu sức khoẻ — README và trang "Giới hạn" của app đều cam kết "dữ liệu lưu
+# trong máy local, KHÔNG đưa lên cloud công khai". File này nằm cạnh app.py nên
+# nếu không loại trừ ở đây, chỉ một lệnh `git add .` là nó lên GitHub public.
+phan_hoi_bac_si.json
+
+# Mô hình do retrain.py sinh ra. Không phải bí mật, nhưng là file nhị phân vài
+# MB thay đổi mỗi lần chạy — không nên nằm trong lịch sử git.
+mo_hinh_breathsafe_moi.joblib

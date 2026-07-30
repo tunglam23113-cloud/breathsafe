@@ -1032,7 +1032,13 @@ elif ten_trang == "Sàng lọc hàng loạt":
             st.warning("File chỉ có dòng tiêu đề, chưa có ca nào để sàng lọc.")
             st.stop()
 
-        st.success(f"Đã đọc {len(df_vao)} ca. Đang sàng lọc…")
+        # Dòng trạng thái phải BIẾN ĐI khi chạy xong. Bản trước dùng st.success
+        # nên câu "Đang sàng lọc…" nằm lại vĩnh viễn phía trên bảng kết quả đã
+        # hoàn tất — người dùng đọc thấy app vẫn đang chạy trong khi mọi con số
+        # bên dưới đã xong, và với file vài nghìn ca thì không biết nên chờ hay
+        # nên tin bảng.
+        dong_trang_thai = st.empty()
+        dong_trang_thai.info(f"Đã đọc {len(df_vao)} ca. Đang sàng lọc…")
 
         ket_qua_dong = []
         thanh_tien_do = st.progress(0.0)
@@ -1060,6 +1066,7 @@ elif ten_trang == "Sàng lọc hàng loạt":
                 )
             thanh_tien_do.progress(vi_tri / len(df_vao))
         thanh_tien_do.empty()
+        dong_trang_thai.success(f"Đã sàng lọc xong {len(df_vao)} ca.")
 
         df_cham = pd.DataFrame(ket_qua_dong).drop(columns=["Dòng"])
         # Bỏ khỏi file gốc những cột TRÙNG TÊN với cột kết quả. Việc hay xảy ra
@@ -1067,10 +1074,10 @@ elif ten_trang == "Sàng lọc hàng loạt":
         # đây: khi đó bảng có HAI cột "Mức nguy cơ", nên df_ra["Mức nguy cơ"] trả
         # về một DataFrame chứ không phải một cột, và cả trang chết ở dòng
         # int((...).sum()) ngay bên dưới.
-        # "Khớp đáp án" cũng phải nằm trong danh sách: nó không do df_cham sinh ra
-        # mà được gán thêm ở bước chấm điểm phía dưới, nên nếu file nạp vào đã có
-        # cột đó thì vẫn thành hai cột trùng tên.
-        cot_ket_qua = list(df_cham.columns) + ["Khớp đáp án"]
+        # "Đáp án" và "Khớp đáp án" cũng phải nằm trong danh sách: chúng không do
+        # df_cham sinh ra mà được gán thêm ở bước chấm điểm phía dưới, nên nếu file
+        # nạp vào đã có cột đó thì vẫn thành hai cột trùng tên.
+        cot_ket_qua = list(df_cham.columns) + ["Đáp án", "Khớp đáp án"]
         trung_ten = [c for c in cot_ket_qua if c in df_vao.columns]
         if trung_ten:
             st.caption(
@@ -1097,28 +1104,60 @@ elif ten_trang == "Sàng lọc hàng loạt":
             )
 
         # --- Chấm điểm nếu file có sẵn đáp án -------------------------------
+        # Đáp án được chuẩn hoá về đúng ba chuỗi "Thấp"/"Trung bình"/"Cao"; ô nào
+        # không đọc được thì thành NaN — xem phần cảnh báo bên dưới.
         cot_dap_an = None
         if "expected" in df_vao.columns:
-            dap_an = df_vao["expected"].astype(str)
+            dap_an = df_vao["expected"].where(
+                df_vao["expected"].isin(list(MUC_NGUY_CO.values()))
+            )
             cot_dap_an = "expected"
         elif "risk_level" in df_vao.columns:
             dap_an = df_vao["risk_level"].map(MUC_NGUY_CO)
             cot_dap_an = "risk_level"
 
         if cot_dap_an is not None:
-            df_ra["Khớp đáp án"] = df_ra["Mức nguy cơ"] == dap_an.values
-            cham = df_ra[df_ra["Mức nguy cơ"] != "LỖI"]
-            n_khop = int(cham["Khớp đáp án"].sum())
+            # Ô đáp án KHÔNG đọc được (risk_level = 9, expected = "cao" viết
+            # thường, ô để trống…) phải bị loại khỏi phép chấm, không được im
+            # lặng tính là "hệ thống trả lời sai". Bản trước so trực tiếp nên một
+            # file có 30 ô đáp án gõ sai làm tỉ lệ khớp tụt 10% mà không có dòng
+            # nào nói vì sao — người dùng kết luận hệ thống tệ đi, trong khi lỗi
+            # nằm ở cột đáp án của chính họ.
+            dap_an_ok = dap_an.notna().values
+            df_ra["Đáp án"] = dap_an.values
+            df_ra["Khớp đáp án"] = pd.Series(pd.NA, index=df_ra.index, dtype="object")
+            co_cham = (df_ra["Mức nguy cơ"] != "LỖI").values & dap_an_ok
+            df_ra.loc[co_cham, "Khớp đáp án"] = (
+                df_ra.loc[co_cham, "Mức nguy cơ"] == dap_an.values[co_cham]
+            )
+
+            # cham = các dòng ĐÃ chấm được, nên "Khớp đáp án" của chúng luôn là
+            # True/False (không có ô trống) — đếm bằng astype(bool) là đủ.
+            cham = df_ra[co_cham]
+            n_khop = int(cham["Khớp đáp án"].astype(bool).sum())
             # "Bỏ sót" = đáp án Cao mà hệ thống nói nhẹ hơn. Đây là loại sai
             # nguy hiểm, phải tách riêng chứ không gộp chung vào "sai".
             bo_sot = cham[
-                (dap_an.reindex(cham.index) == "Cao") & (cham["Mức nguy cơ"] != "Cao")
+                (cham["Đáp án"] == "Cao") & (cham["Mức nguy cơ"] != "Cao")
             ]
             st.subheader(f"Chấm điểm (dùng cột `{cot_dap_an}` làm đáp án)")
             d1, d2, d3 = st.columns(3)
             d1.metric("Khớp đáp án", f"{n_khop}/{len(cham)}")
             d2.metric("Tỉ lệ", f"{100 * n_khop / max(len(cham), 1):.1f}%")
             d3.metric("Bỏ sót ca Cao", len(bo_sot), help="Loại sai nguy hiểm nhất")
+
+            so_dap_an_xau = int((~dap_an_ok).sum())
+            if so_dap_an_xau:
+                hop_le = (
+                    "0 / 1 / 2" if cot_dap_an == "risk_level"
+                    else "Thấp / Trung bình / Cao"
+                )
+                st.warning(
+                    f"{so_dap_an_xau} dòng có ô `{cot_dap_an}` không đọc được nên "
+                    f"KHÔNG được đưa vào phép chấm ở trên (giá trị hợp lệ: "
+                    f"{hop_le}). Cột **Khớp đáp án** của những dòng đó để trống — "
+                    "chúng không bị tính là hệ thống trả lời sai."
+                )
             st.caption(
                 "Nhìn ô **Bỏ sót ca Cao** trước tiên. Tỉ lệ khớp chung có thể đẹp "
                 "trong khi vẫn bỏ sót đúng những ca nguy hiểm nhất."
