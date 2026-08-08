@@ -62,32 +62,79 @@ MAU = {
 st.markdown(
     """
     <style>
-    /* --- Chữ to cho người lớn tuổi (yêu cầu >= 18px) --- */
-    html, body, [class*="css"], .stMarkdown, p, li { font-size: 17px; }
+    /* =====================================================================
+       GIAO DIỆN "GLASS 3D" — dựng theo bản mockup breathsafe_3d_mockup.html
+       ---------------------------------------------------------------------
+       Ba nguyên tắc giữ nguyên từ bản trước, KHÔNG được đánh đổi lấy thẩm mỹ:
+         1. Chữ vẫn to (>= 17px) — người dùng là nhân viên y tế lớn tuổi.
+         2. Đỏ / vàng / xanh lá vẫn chỉ dành cho 3 MỨC NGUY CƠ. Toàn bộ phần
+            trang trí ở đây dùng dải teal, không đụng vào 3 màu cảnh báo.
+         3. Không tải font hay ảnh từ Internet — app phải chạy được ngoại tuyến.
+            Vì vậy chỉ dùng gradient/shadow CSS và font có sẵn trong máy.
+       ===================================================================== */
+
+    :root {
+        --bs-teal:      #0E8E80;
+        --bs-teal-dam:  #0B746B;
+        --bs-teal-sang: #20B7A2;
+        --bs-nav:       #033F3D;
+        --bs-chu:       #10263A;
+        --bs-chu-mo:    #6C7C89;
+        --bs-vien:      rgba(16, 38, 58, 0.08);
+        --bs-kinh:      rgba(255, 255, 255, 0.78);
+        --bs-bong:      0 18px 45px rgba(10, 65, 61, 0.14),
+                        0 2px 10px rgba(16, 38, 58, 0.06);
+        --bs-bong-nho:  0 10px 26px rgba(15, 72, 68, 0.08);
+        --bs-loi:       inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                        inset 0 -1px 0 rgba(16, 38, 58, 0.04);
+    }
+
+    /* --- Nền: hai quầng sáng teal/xanh + dải chuyển màu bạc hà ------------ */
+    .stApp {
+        background:
+            radial-gradient(circle at 10% 0%, rgba(80, 205, 186, 0.22), transparent 35%),
+            radial-gradient(circle at 100% 10%, rgba(75, 158, 248, 0.16), transparent 30%),
+            linear-gradient(180deg, #F8FCFB 0%, #EDF7F5 100%);
+        background-attachment: fixed;
+    }
+    /* Thanh công cụ của Streamlit nằm đè lên nền — phải trong suốt, nếu không
+       sẽ có một vệt trắng cắt ngang quầng sáng ở góc trên. */
+    [data-testid="stHeader"] { background: transparent !important; }
+
+    /* --- Chữ to cho người lớn tuổi (yêu cầu >= 17px) --- */
+    html, body, [class*="css"], .stMarkdown, p, li {
+        font-size: 17px;
+        color: var(--bs-chu);
+    }
+    body, .stApp {
+        font-family: Inter, "Segoe UI Variable", "Segoe UI", ui-sans-serif,
+                     system-ui, -apple-system, sans-serif;
+    }
 
     /* --- Giới hạn bề rộng: dòng chữ quá dài rất khó đọc --- */
-    .block-container {
-        max-width: 1180px;
-        padding-top: 2rem;
+    [data-testid="stMainBlockContainer"] {
+        max-width: 1280px;
+        padding-top: 2.2rem;
         padding-bottom: 4rem;
     }
 
     /* --- Tiêu đề --- */
     h1 {
-        font-size: 2.1rem !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em;
-        color: #0F172A;
+        font-size: 2.05rem !important;
+        font-weight: 760 !important;
+        letter-spacing: -0.025em;
+        color: var(--bs-chu) !important;
+        line-height: 1.15 !important;
     }
-    h2 { font-size: 1.4rem !important; font-weight: 650 !important; }
+    h2 { font-size: 1.35rem !important; font-weight: 700 !important; }
 
     /* h3 = tiêu đề từng thẻ ("Thông tin chung", "Dấu hiệu sinh tồn"...).
        Streamlit bọc chữ trong <span> con, nên phải nhắm cả span — đặt màu trên
        riêng h3 sẽ không xuống được tới chữ. */
     h3, h3 span {
-        font-size: 1rem !important;
-        font-weight: 700 !important;
-        color: #0F766E !important;
+        font-size: 0.86rem !important;
+        font-weight: 800 !important;
+        color: var(--bs-teal-dam) !important;
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
@@ -95,87 +142,320 @@ st.markdown(
     h3 [data-testid="stHeaderActionElements"] { display: none; }
 
     /* --- Nhãn của ô nhập: đậm và dễ đọc --- */
-    .stSlider label, .stNumberInput label, .stRadio label,
-    .stSelectbox label, .stCheckbox label, .stFileUploader label {
-        font-size: 16px !important;
-        font-weight: 550 !important;
-        color: #1E293B !important;
+    [data-testid="stWidgetLabel"] p {
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        color: #1E3040 !important;
     }
 
     /* --- Ghi chú dưới ô nhập --- */
     .stCaption, [data-testid="stCaptionContainer"] {
-        color: #64748B !important;
-        font-size: 14px !important;
+        color: var(--bs-chu-mo) !important;
+        font-size: 13.5px !important;
     }
 
     /* --- Checkbox triệu chứng: to hơn, dễ bấm --- */
     .stCheckbox [data-testid="stMarkdownContainer"] p { font-size: 17px !important; }
 
-    /* --- Nút chính --- */
-    .stButton > button, .stFormSubmitButton > button {
-        font-size: 17px !important;
-        font-weight: 650 !important;
-        letter-spacing: 0.03em;
-        border-radius: 10px;
-        padding: 0.7rem 1rem;
-        transition: transform 0.06s ease;
-    }
-    .stButton > button:active, .stFormSubmitButton > button:active {
-        transform: translateY(1px);
+    /* =====================================================================
+       THẺ KÍNH (glass card)
+       ---------------------------------------------------------------------
+       Streamlit 1.41 gắn viền của st.container(border=True) vào chính
+       stVerticalBlockBorderWrapper — nhưng NÓ CŨNG bọc mọi container khác
+       (cột, khối thường), nên không thể nhắm thẳng vào testid đó: làm vậy thì
+       từng cột cũng biến thành một tấm kính, chồng kính lên kính thành đục.
+
+       Cách phân biệt: mỗi thẻ được đặt key bắt đầu bằng "the_", Streamlit đổi
+       key thành class "st-key-the_…". Đó là mỏ neo duy nhất chỉ đúng các thẻ.
+
+       Và phải tô lên LỚP BỌC NGOÀI (stVerticalBlockBorderWrapper), không tô lên
+       chính phần tử mang class st-key-… (là stVerticalBlock bên trong). Đây là
+       chỗ dễ sai nhất:
+
+         wrapper  ← Streamlit đặt viền + padding của border=True ở ĐÂY
+           └ div
+               └ stVerticalBlock.st-key-the_…  ← Streamlit ĐO bề rộng ở ĐÂY rồi
+                                                 gán width tính bằng pixel cho
+                                                 từng widget con
+       Nhét padding vào lớp trong thì Streamlit đã đo bề rộng TRƯỚC khi có
+       padding, nên mọi widget con giữ nguyên bề rộng cũ và thò ra khỏi thẻ đúng
+       bằng 2 lần padding — thanh trượt, nút −/+ đều lòi ra ngoài mép kính.
+       Tô lên lớp bọc thì lớp trong tự hẹp lại, Streamlit đo được số đúng.
+       ===================================================================== */
+    [data-testid="stVerticalBlockBorderWrapper"]:has(> div > [class*="st-key-the_"]) {
+        box-sizing: border-box;
+        background: var(--bs-kinh) !important;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.72) !important;
+        border-radius: 22px !important;
+        box-shadow: var(--bs-bong);
+        padding: 1.15rem 1.25rem !important;
     }
 
-    /* --- Thẻ (container có viền) ---
-       Streamlit 1.41 gắn viền vào chính stVerticalBlock, không phải một
-       "BorderWrapper" riêng như các bản khác. Nhắm cả hai để phòng khi nâng
-       cấp Streamlit thì giao diện không vỡ. */
-    [data-testid="stVerticalBlockBorderWrapper"],
-    [data-testid="stVerticalBlock"][class*="st-emotion"],
+    /* Form không tự vẽ khung: bên trong nó đã có 3 thẻ kính rồi, thêm một lớp
+       nữa là kính chồng kính. */
     [data-testid="stForm"] {
-        border-radius: 12px !important;
-    }
-    [data-testid="stForm"] {
-        border-color: #E2E8F0 !important;
-        padding: 1.25rem !important;
-        background: #FCFDFE;
+        border: 0 !important;
+        background: transparent !important;
+        padding: 0 !important;
     }
 
-    /* --- THANH BÊN (dark teal, kiểu "clinical workspace") --- */
+    /* =====================================================================
+       THANH BÊN — tấm thẻ tối màu bo tròn, nổi trên nền bạc hà
+       ===================================================================== */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #10312E 0%, #0B2320 100%);
+        background: transparent !important;
+        border-right: 0 !important;
+        padding: 16px 0 16px 16px;
+        width: 300px !important;
     }
+    [data-testid="stSidebarContent"] {
+        border-radius: 28px;
+        background:
+            radial-gradient(circle at 50% 112%, rgba(65, 225, 193, 0.30), transparent 42%),
+            linear-gradient(160deg, var(--bs-nav) 0%, #043533 62%, #052C2B 100%);
+        box-shadow: 0 28px 60px rgba(0, 57, 53, 0.32);
+        overflow: hidden;
+    }
+    /* Streamlit chèn sẵn một dải đầu thanh bên cao 83px: 23px + 25px padding
+       cộng một stLogoSpacer cao 34px để dành chỗ cho st.logo(). App này không
+       gọi st.logo() nên dải đó hoàn toàn rỗng — cộng với padding của phần nội
+       dung là 102px trống trước khi tới chữ "BreathSafe".
+       Thu dải này lại, nhưng KHÔNG xoá hẳn: nút thu gọn thanh bên nằm trong đó,
+       ẩn cho tới khi rê chuột. Ép chiều cao về 0 là nút đè lên khối thương hiệu. */
+    [data-testid="stSidebarHeader"] {
+        position: relative;
+        padding: 0.55rem 0.9rem 0 !important;
+    }
+    [data-testid="stLogoSpacer"] { display: none; }
+    [data-testid="stSidebarUserContent"] { padding: 0.35rem 1rem 2rem 1rem; }
+    /* Nút thu gọn ở thế static và bị display:none cho tới khi rê chuột vào
+       thanh bên. Thu dải đầu lại mà để nguyên như vậy thì lúc nó hiện ra, nó
+       chiếm 34px và ĐẨY cả khối thương hiệu lẫn thanh điều hướng tụt xuống —
+       nội dung giật mỗi lần rê chuột. Cho nó nổi ở góc trên phải để hiện hay
+       ẩn cũng không đụng vào bố cục. */
+    [data-testid="stSidebarCollapseButton"] {
+        position: absolute !important;
+        top: 6px; right: 8px; z-index: 5;
+    }
+    /* Nút thu gọn thanh bên nằm trên nền tối — mũi tên phải sáng màu. */
+    [data-testid="stSidebarCollapseButton"] svg { color: rgba(255,255,255,0.7); }
+
     /* Chữ trong thanh bên đổi sang sáng màu để đọc được trên nền tối. */
-    [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] [role="radiogroup"] label p,
     [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-        color: #CBD5E1 !important;
+        color: #CFE9E4 !important;
     }
-    [data-testid="stSidebar"] h1 {
-        font-size: 1.5rem !important;
-        color: #FFFFFF !important;
-        letter-spacing: -0.01em;
+
+    /* Khối thương hiệu (logo + tên app) — dựng bằng HTML ở phần thanh bên. */
+    .bs-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+    .bs-brand .logo {
+        width: 44px; height: 44px; border-radius: 15px; flex: none;
+        display: grid; place-items: center; font-size: 22px; line-height: 1;
+        background: linear-gradient(145deg, #FF9DA3, #F96F7D);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.75),
+                    0 10px 22px rgba(255, 98, 116, 0.24);
     }
-    /* Điều hướng: mỗi mục là một "viên" bấm được; mục đang chọn tô nền teal.
-       :has() được Chrome/Edge hỗ trợ — app desktop chạy trong 2 trình duyệt này. */
-    [data-testid="stSidebar"] [role="radiogroup"] { gap: 3px; }
+    .bs-brand strong {
+        display: block; font-size: 19px; color: #FFFFFF; line-height: 1.2 !important;
+    }
+    /* line-height phải !important: khối này nằm trong stMarkdownContainer, mà
+       Streamlit đặt line-height ~1.6 ở đó — không ghi đè thì hai dòng phụ đề
+       cách nhau xa đến mức trông như ba khối rời nhau, lệch hẳn với logo. */
+    .bs-brand small {
+        display: block; color: rgba(255, 255, 255, 0.62);
+        font-size: 12px !important; line-height: 1.35 !important;
+    }
+
+    /* Điều hướng: mỗi mục là một "viên" bấm được; mục đang chọn tô gradient
+       teal có vệt sáng ở mép trên cho cảm giác nổi khối.
+       :has() được Chrome/Edge hỗ trợ — app desktop chạy trong 2 trình duyệt này.
+       Nếu trình duyệt không hiểu :has(), cả khối luật bị bỏ qua và nút radio
+       hiện lại như bình thường — hỏng thẩm mỹ chứ không hỏng chức năng. */
+    [data-testid="stSidebar"] [role="radiogroup"] { gap: 6px; }
     [data-testid="stSidebar"] [role="radiogroup"] label {
-        padding: 0.5rem 0.75rem;
-        border-radius: 8px;
-        transition: background 0.12s ease;
+        padding: 0.62rem 0.8rem;
+        border-radius: 14px;
+        transition: background 0.16s ease, transform 0.16s ease;
     }
+    /* Giấu vòng tròn radio: phần tử con KHÔNG chứa chữ chính là cái vòng đó. */
+    [data-testid="stSidebar"] [role="radiogroup"] label
+        > div:not(:has([data-testid="stMarkdownContainer"])) { display: none; }
     [data-testid="stSidebar"] [role="radiogroup"] label:hover {
-        background: rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateX(2px);
     }
     [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-        background: #0F766E;
+        background: linear-gradient(135deg, rgba(56, 206, 181, 0.95), rgba(16, 136, 125, 0.9));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45),
+                    0 10px 24px rgba(31, 183, 158, 0.25);
     }
     [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p {
         color: #FFFFFF !important;
-        font-weight: 650 !important;
+        font-weight: 700 !important;
     }
 
+    /* =====================================================================
+       NÚT BẤM
+       ===================================================================== */
+    /* Nhắm theo data-testid chứ không theo .stButton: nút "Browse files" nằm
+       trong ô tải file, không nằm trong stButton — bản trước dùng .stButton nên
+       riêng nó giữ nguyên góc bo 8px, lệch hẳn với các nút còn lại.
+       Loại trừ stBaseButton-header*: đó là mấy nút của thanh công cụ Streamlit
+       (Deploy, menu ⋮), không phải nút của app. */
+    [data-testid^="stBaseButton-"]:not([data-testid^="stBaseButton-header"]) {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.02em;
+        border-radius: 13px !important;
+        padding: 0.72rem 1.1rem !important;
+        transition: transform 0.06s ease, box-shadow 0.16s ease;
+    }
+    /* Nút chính: khối teal có vệt sáng trên đỉnh và bóng đổ cùng tông. */
+    [data-testid^="stBaseButton-primary"] {
+        color: #FFFFFF !important;
+        border: 0 !important;
+        background: linear-gradient(180deg, #2BC3AD, #0B8D7F) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                    0 10px 22px rgba(11, 141, 127, 0.25) !important;
+    }
+    [data-testid^="stBaseButton-primary"]:hover {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55),
+                    0 14px 28px rgba(11, 141, 127, 0.34) !important;
+    }
+    /* Nút phụ: nền trắng ngả bạc hà, chữ teal. */
+    [data-testid^="stBaseButton-secondary"] {
+        color: #176F67 !important;
+        background: linear-gradient(180deg, #FFFFFF, #EEF9F6) !important;
+        border: 1px solid rgba(14, 142, 128, 0.16) !important;
+        box-shadow: var(--bs-loi), 0 6px 16px rgba(15, 72, 68, 0.06) !important;
+    }
+    [data-testid^="stBaseButton-secondary"]:hover {
+        border-color: rgba(14, 142, 128, 0.4) !important;
+        color: #0B746B !important;
+    }
+    [data-testid^="stBaseButton-"]:not([data-testid^="stBaseButton-header"]):active {
+        transform: translateY(1px);
+    }
+
+    /* =====================================================================
+       Ô NHẬP LIỆU
+       ===================================================================== */
+    /* Ô nhập chữ / ô chọn: viền nằm ngay trên chính phần tử baseweb. */
+    [data-baseweb="textarea"],
+    [data-testid="stTextInput"] [data-baseweb="input"],
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child {
+        border-radius: 13px !important;
+        border: 1px solid var(--bs-vien) !important;
+        background: #FFFFFF !important;
+        box-shadow: var(--bs-loi) !important;
+    }
+    /* Ô SỐ thì khác: khung thật là stNumberInputContainer — nó bọc cả ô chữ LẪN
+       hai nút −/+. Tô viền vào [data-baseweb="input"] bên trong (như bản trước)
+       thì chỉ phần ô chữ được bo góc, còn hai nút −/+ nằm ngoài cái viền đó và
+       trông như một mảng trắng thừa thò ra khỏi ô. Phải tô lên lớp bọc, rồi
+       xoá viền/nền của lớp bên trong đi. */
+    [data-testid="stNumberInputContainer"] {
+        border-radius: 13px !important;
+        border: 1px solid var(--bs-vien) !important;
+        background: #FFFFFF !important;
+        box-shadow: var(--bs-loi) !important;
+        overflow: hidden;
+    }
+    [data-testid="stNumberInputContainer"] [data-baseweb="input"] {
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stNumberInputContainer"]:focus-within,
+    [data-testid="stTextInput"] [data-baseweb="input"]:focus-within,
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child:focus-within {
+        border-color: rgba(14, 142, 128, 0.45) !important;
+    }
+    /* Hai nút −/+ của st.number_input thành viên nhỏ màu bạc hà. */
+    [data-testid="stNumberInputStepUp"], [data-testid="stNumberInputStepDown"] {
+        background: #EDF6F4 !important;
+        color: var(--bs-teal-dam) !important;
+        border: 0 !important;
+        border-radius: 9px !important;
+        margin: 4px 2px !important;
+    }
+
+    /* Con trượt: núm trắng viền teal, nổi lên như một hạt nút. */
+    [data-testid="stSlider"] [role="slider"] {
+        background: #FFFFFF !important;
+        border: 5px solid #0B8F80 !important;
+        box-shadow: 0 4px 10px rgba(11, 143, 128, 0.28) !important;
+    }
+    [data-testid="stSlider"] [data-testid="stSliderThumbValue"] {
+        color: var(--bs-teal-dam) !important;
+        font-weight: 750 !important;
+    }
+    [data-testid="stSlider"] [data-testid="stSliderTickBar"] { color: var(--bs-chu-mo) !important; }
+
+    /* Ô kéo-thả file: nền trắng bóng, biểu tượng mây phóng to đổ bóng teal. */
+    [data-testid="stFileUploaderDropzone"] {
+        background: linear-gradient(145deg, #FFFFFF, #F1FAF8) !important;
+        border: 1px solid rgba(14, 142, 128, 0.18) !important;
+        border-radius: 18px !important;
+        box-shadow: var(--bs-loi), var(--bs-bong-nho);
+    }
+    [data-testid="stFileUploaderDropzone"] svg {
+        color: var(--bs-teal) !important;
+        fill: var(--bs-teal) !important;
+        width: 42px !important; height: 42px !important;
+        filter: drop-shadow(0 8px 14px rgba(12, 143, 128, 0.35));
+    }
+
+    /* =====================================================================
+       KHỐI HIỂN THỊ
+       ===================================================================== */
+    /* Ô số liệu (st.metric) — một thẻ kính nhỏ. */
+    [data-testid="stMetric"] {
+        background: linear-gradient(145deg, rgba(255,255,255,0.98), rgba(246,251,250,0.9));
+        border: 1px solid var(--bs-vien);
+        border-radius: 18px;
+        padding: 1rem 1.1rem;
+        box-shadow: var(--bs-bong-nho), var(--bs-loi);
+    }
+    [data-testid="stMetricValue"] { font-weight: 760 !important; }
+    [data-testid="stMetricLabel"] p { color: var(--bs-chu-mo) !important; }
+
+    /* Hộp thông báo st.info / st.warning / st.error / st.success.
+       CHỈ bo góc và thêm bóng — màu do Streamlit quyết định, vì đỏ/vàng/xanh ở
+       đây mang nghĩa mức nguy cơ, không được đổi vì lý do thẩm mỹ. */
+    [data-testid="stAlertContainer"] {
+        border-radius: 16px !important;
+        box-shadow: 0 8px 22px rgba(15, 72, 68, 0.07);
+    }
+
+    /* Bảng và khung mở rộng. */
+    [data-testid="stDataFrame"], [data-testid="stTable"] {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--bs-bong-nho);
+    }
+    [data-testid="stExpander"] details {
+        border: 1px solid var(--bs-vien) !important;
+        border-radius: 14px !important;
+        background: rgba(255, 255, 255, 0.85) !important;
+        box-shadow: var(--bs-bong-nho);
+    }
+    [data-testid="stExpander"] summary:hover { color: var(--bs-teal-dam) !important; }
+    [data-testid="stCode"] {
+        border-radius: 16px;
+        border: 1px solid var(--bs-vien);
+        box-shadow: var(--bs-bong-nho);
+    }
+    hr { border-color: rgba(16, 38, 58, 0.08) !important; }
+
+    /* =====================================================================
+       CÁC MẢNH HTML TỰ DỰNG
+       ===================================================================== */
     /* --- Phụ đề nhỏ dưới tiêu đề trang --- */
     .bs-subtitle {
-        color: #64748B;
+        color: var(--bs-chu-mo);
         font-size: 15px;
         margin: -0.4rem 0 1.1rem 0;
     }
@@ -185,13 +465,14 @@ st.markdown(
         display: inline-flex;
         align-items: center;
         gap: 0.45rem;
-        background: #ECFDF5;
+        background: linear-gradient(180deg, #F0FDF9, #DCF7EF);
         color: #047857;
         border: 1px solid #A7F3D0;
         padding: 0.35rem 0.85rem;
         border-radius: 999px;
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 700;
+        box-shadow: var(--bs-loi);
     }
 
     /* --- Đầu thẻ ghi âm tiếng ho --- */
@@ -204,19 +485,20 @@ st.markdown(
     .bs-audio-head .thoi-luong {
         font-variant-numeric: tabular-nums;
         font-weight: 700;
-        color: #0F172A;
+        color: var(--bs-chu);
     }
 
     /* --- Banner kết quả (dựng bằng HTML riêng) --- */
     .bs-ketqua {
-        border-radius: 14px;
+        border-radius: 20px;
         padding: 1.5rem 1.75rem;
         border: 2px solid;
         margin-bottom: 0.5rem;
+        box-shadow: var(--bs-bong);
     }
     .bs-ketqua .muc {
         font-size: 2rem;
-        font-weight: 750;
+        font-weight: 780;
         letter-spacing: -0.02em;
         margin: 0;
         line-height: 1.2;
@@ -229,19 +511,66 @@ st.markdown(
         padding: 0.15rem 0.6rem;
         border-radius: 999px;
         font-size: 13px;
-        font-weight: 650;
+        font-weight: 700;
         margin-left: 0.4rem;
     }
 
     /* --- Nguồn kết luận (rule / ai / hậu kiểm) --- */
     .bs-nguon {
-        border-left: 4px solid #0F766E;
-        background: #F0FDFA;
+        border-left: 4px solid var(--bs-teal);
+        background: linear-gradient(90deg, #F0FDFA, rgba(240, 253, 250, 0.35));
         padding: 0.85rem 1rem;
-        border-radius: 0 8px 8px 0;
+        border-radius: 0 12px 12px 0;
         font-size: 15px;
         margin-top: 0.75rem;
     }
+
+    /* --- Dải 5 bước "ba lớp an toàn" ở trang Về hệ thống --- */
+    .bs-flow {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 22px;
+        margin: 0.4rem 0 1.2rem 0;
+    }
+    .bs-flow .buoc {
+        position: relative;
+        background: linear-gradient(145deg, rgba(255,255,255,0.98), rgba(246,251,250,0.9));
+        border: 1px solid var(--bs-vien);
+        border-radius: 18px;
+        padding: 1rem;
+        box-shadow: var(--bs-bong-nho), var(--bs-loi);
+        font-size: 14px;
+        line-height: 1.45;
+    }
+    .bs-flow .buoc:not(:last-child):after {
+        content: "→";
+        position: absolute; right: -18px; top: 42%;
+        font-size: 22px; font-weight: 900; color: #13A28F;
+    }
+    .bs-flow .so {
+        width: 28px; height: 28px; border-radius: 10px;
+        display: grid; place-items: center; margin-bottom: 8px;
+        color: #FFFFFF; font-weight: 800; font-size: 14px;
+        background: linear-gradient(145deg, #25C1AB, #0C8E80);
+        box-shadow: 0 8px 16px rgba(12, 142, 128, 0.2);
+    }
+    .bs-flow .buoc b { display: block; font-size: 14px; }
+    .bs-flow .buoc span { color: var(--bs-chu-mo); font-size: 12.5px; }
+    @media (max-width: 1100px) { .bs-flow { grid-template-columns: 1fr 1fr; }
+                                 .bs-flow .buoc:after { display: none; } }
+
+    /* --- Thẻ "cơ chế an toàn" ở trang Về hệ thống --- */
+    .bs-coche {
+        background: linear-gradient(145deg, rgba(255,255,255,0.98), rgba(246,251,250,0.9));
+        border: 1px solid var(--bs-vien);
+        border-radius: 18px;
+        padding: 1.1rem 1.2rem;
+        box-shadow: var(--bs-bong-nho), var(--bs-loi);
+        margin-bottom: 1rem;
+    }
+    .bs-coche b { color: var(--bs-chu); font-size: 16px; }
+    .bs-coche p { font-size: 14.5px; color: #3D4E5C; margin: 0.5rem 0 0 0; line-height: 1.55; }
+    .bs-coche em { color: var(--bs-teal-dam); font-style: italic; }
 
     /* --- Bỏ khoảng trắng thừa của Streamlit --- */
     [data-testid="stVerticalBlock"] { gap: 0.7rem; }
@@ -648,10 +977,28 @@ if he_thong is None:
 # THANH BÊN
 # ---------------------------------------------------------------------------
 
+# Biểu tượng đứng trước tên trang trong thanh điều hướng. Chỉ là trang trí —
+# tên trang (phần dùng để rẽ nhánh) vẫn nằm nguyên trong GIÁ TRỊ của st.radio,
+# không phải trong chuỗi hiển thị này.
+ICON_TRANG = {
+    "Sàng lọc": "🩺",
+    "Sàng lọc hàng loạt": "📚",
+    "Lịch sử ca": "🕘",
+    "Phản hồi bác sĩ": "💬",
+    "Ca lâm sàng": "🧪",
+    "Về hệ thống": "⚙️",
+    "Giới hạn": "◉",
+}
+
 with st.sidebar:
-    st.title("🫁 BreathSafe")
-    st.caption("Sàng lọc nguy cơ hô hấp · trạm y tế xã")
-    st.write("")
+    # Dựng bằng HTML thay cho st.title: cần cái ô logo bo góc màu san hô như
+    # bản mockup, mà st.title thì không có chỗ đặt nó.
+    st.markdown(
+        '<div class="bs-brand"><div class="logo">🫁</div>'
+        "<div><strong>BreathSafe</strong>"
+        "<small>Sàng lọc nguy cơ hô hấp<br>trạm y tế xã</small></div></div>",
+        unsafe_allow_html=True,
+    )
 
     # Giữ số thứ tự ở giá trị (để phần điều hướng phía dưới không phải sửa),
     # nhưng giấu số đi khi hiển thị cho gọn — dùng format_func.
@@ -666,7 +1013,9 @@ with st.sidebar:
             "6. Về hệ thống",
             "7. Giới hạn",
         ],
-        format_func=lambda s: s.split(". ", 1)[1],
+        format_func=lambda s: (
+            f"{ICON_TRANG.get(s.split('. ', 1)[1], '•')}  {s.split('. ', 1)[1]}"
+        ),
         label_visibility="collapsed",
     )
     # Tách phần tên ra để phía dưới điều hướng bằng TÊN chứ không bằng số thứ
@@ -738,7 +1087,10 @@ if ten_trang == "Sàng lọc":
         c1, c2, c3 = st.columns(3, gap="medium")
 
         with c1:
-            with st.container(border=True):
+            # key="the_…" không chỉ để phân biệt widget: CSS ở đầu file nhận
+            # diện THẺ KÍNH qua class "st-key-the_…". Bỏ key thì thẻ mất nền
+            # kính và trở lại khung viền xám.
+            with st.container(border=True, key="the_thong_tin_chung"):
                 st.markdown("### Thông tin chung")
                 age = st.number_input("Tuổi", 0, 120, int(gia_tri("age", 40)))
                 days_sick = st.number_input(
@@ -754,7 +1106,7 @@ if ten_trang == "Sàng lọc":
                 st.caption("Hen, COPD, tim mạch, tiểu đường, ung thư…")
 
         with c2:
-            with st.container(border=True):
+            with st.container(border=True, key="the_sinh_ton"):
                 st.markdown("### Dấu hiệu sinh tồn")
                 spo2 = st.slider(
                     "SpO2 — oxy trong máu (%)", 70, 100, int(gia_tri("spo2", 97))
@@ -776,7 +1128,7 @@ if ten_trang == "Sàng lọc":
                 st.caption("Sốt khi > 37.5°C. Trên 39°C là sốt cao.")
 
         with c3:
-            with st.container(border=True):
+            with st.container(border=True, key="the_trieu_chung"):
                 st.markdown("### Triệu chứng")
                 st.caption("Tích vào những dấu hiệu bệnh nhân đang có.")
                 fever = st.checkbox("Sốt", bool(gia_tri("fever", 0)))
@@ -931,7 +1283,7 @@ if ten_trang == "Sàng lọc":
         k1, k2 = st.columns(2, gap="large")
 
         with k1:
-            with st.container(border=True):
+            with st.container(border=True, key="the_khuyen_nghi"):
                 st.markdown("### Khuyến nghị cho nhân viên y tế")
                 # Dùng thẻ <b> chứ KHÔNG dùng **…** của Markdown: mấy dòng này
                 # được nhét vào trong một <div> HTML thô ở dưới (unsafe_allow_html),
@@ -948,7 +1300,7 @@ if ten_trang == "Sàng lọc":
                     )
 
         with k2:
-            with st.container(border=True):
+            with st.container(border=True, key="the_gia_dinh"):
                 st.markdown("### Bản dành cho gia đình")
                 st.caption("Lời dặn bằng câu đơn giản, để đọc cho người nhà nghe.")
                 # Cũng phải dùng <b> vì lý do y hệt khối khuyến nghị ở trên: đoạn
@@ -1390,7 +1742,7 @@ elif ten_trang == "Ca lâm sàng":
     # nạp trong app (ví dụ sau khi retrain). Nút này chấm lại tại chỗ bằng
     # ĐÚNG mô hình app đang dùng, nên giám khảo bấm một nút là thấy bằng chứng
     # thật chứ không phải một con số lưu từ hôm trước.
-    with st.container(border=True):
+    with st.container(border=True, key="the_tu_kiem"):
         st.markdown("### Tự kiểm tra tại chỗ")
         st.caption(
             "Chạy lại toàn bộ bộ ca bằng chính mô hình app đang nạp, so với "
@@ -1481,8 +1833,31 @@ elif ten_trang == "Về hệ thống":
     st.title("Hệ thống hoạt động thế nào")
 
     st.subheader("Ba lớp an toàn")
-    st.code(
+    # Dải 5 bước dựng bằng HTML. Sơ đồ ASCII cũ vẫn giữ ở ngay bên dưới trong
+    # một expander: nó nói rõ ĐIỀU KIỆN rẽ nhánh của từng lớp ("trúng quy tắc",
+    # "ca quá lạ"…) — thứ mà 5 ô vuông không diễn tả nổi. Đây là trang giải
+    # thích cách hệ thống quyết định, nên phần chữ chính xác không được bỏ đi
+    # để đổi lấy hình đẹp.
+    st.markdown(
         """
+        <div class="bs-flow">
+          <div class="buoc"><div class="so">1</div><b>Người bệnh đến trạm y tế</b>
+            <span>Nhân viên y tế nhập chỉ số</span></div>
+          <div class="buoc"><div class="so">2</div><b>Quy tắc cảnh báo đỏ</b>
+            <span>Trúng quy tắc → CAO ngay, không hỏi AI</span></div>
+          <div class="buoc"><div class="so">3</div><b>Kiểm tra ca lạ (OOD)</b>
+            <span>Quá lạ → từ chối dự đoán, khuyến cáo chuyển tuyến</span></div>
+          <div class="buoc"><div class="so">4</div><b>AI phân loại 3 mức</b>
+            <span>Random Forest đã hiệu chuẩn</span></div>
+          <div class="buoc"><div class="so">5</div><b>Hậu kiểm an toàn</b>
+            <span>Thấp mà có ≥2 dấu hiệu đáng ngờ → nâng lên Trung bình</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.expander("Xem sơ đồ đầy đủ kèm điều kiện rẽ nhánh"):
+        st.code(
+            """
 Người bệnh đến trạm y tế
         ↓
 [LỚP 1] Quy tắc cảnh báo đỏ  ──trúng quy tắc──→  CAO ngay (không hỏi AI)
@@ -1495,9 +1870,9 @@ Người bệnh đến trạm y tế
         │        đã bất thường (SpO2 < 92 / nhiệt độ > 39)
         ↓
 Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
-        """,
-        language=None,
-    )
+            """,
+            language=None,
+        )
 
     st.info(
         "**Nguyên tắc cốt lõi:** AI không bao giờ được một mình kết luận rằng "
@@ -1505,34 +1880,36 @@ Kết quả + lý do (2 cấp độ: nhân viên y tế / gia đình)
     )
 
     st.subheader("Bốn cơ chế an toàn")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(
-            "**1. Hiệu chuẩn xác suất (Calibration)**\n\n"
-            "Khi hệ thống nói '80%', thì trong 100 ca tương tự phải có khoảng 80 "
-            "ca thật sự nguy cơ cao. Nếu không, con số đó chỉ là trang trí.\n\n"
-            "*Em không chỉ tối ưu Recall — em đảm bảo xác suất em đưa ra là xác "
-            "suất thật.*"
-        )
-        st.markdown(
-            "**3. Bộ 20 ca lâm sàng kinh điển**\n\n"
-            "Các ca này KHÔNG sinh ra từ quy tắc của em, nên chúng kiểm tra hệ "
-            "thống thật sự.\n\n"
-            "*Em không chỉ test trên dữ liệu mô phỏng.*"
-        )
-    with c2:
-        st.markdown(
-            "**2. Phát hiện ca lạ (OOD Detection)**\n\n"
-            "Gặp ca khác xa dữ liệu từng học, hệ thống từ chối dự đoán thay vì "
-            "đoán bừa một cách tự tin.\n\n"
-            "*AI của em biết khi nào nó không nên tin chính nó.*"
-        )
-        st.markdown(
-            "**4. Học từ phản hồi bác sĩ**\n\n"
-            "Bác sĩ có thể không đồng ý và ghi lý do. Ý kiến đó được đưa vào "
-            "huấn luyện lại với trọng số cao hơn.\n\n"
-            "*Em không xây AI thay bác sĩ — em xây AI học từ bác sĩ.*"
-        )
+    # Bốn thẻ nổi khối. Chữ nằm trong <div> HTML thô nên phải dùng <b>/<em>
+    # thay cho **…**/*…* của Markdown — bên trong HTML, Streamlit không dịch
+    # Markdown nữa (cùng lý do đã ghi ở khối khuyến nghị trang Sàng lọc).
+    CO_CHE = [
+        ("1. Hiệu chuẩn xác suất (Calibration)",
+         "Khi hệ thống nói '80%', thì trong 100 ca tương tự phải có khoảng 80 "
+         "ca thật sự nguy cơ cao. Nếu không, con số đó chỉ là trang trí.",
+         "Em không chỉ tối ưu Recall — em đảm bảo xác suất em đưa ra là xác "
+         "suất thật."),
+        ("2. Phát hiện ca lạ (OOD Detection)",
+         "Gặp ca khác xa dữ liệu từng học, hệ thống từ chối dự đoán thay vì "
+         "đoán bừa một cách tự tin.",
+         "AI của em biết khi nào nó không nên tin chính nó."),
+        ("3. Bộ 20 ca lâm sàng kinh điển",
+         "Các ca này KHÔNG sinh ra từ quy tắc của em, nên chúng kiểm tra hệ "
+         "thống thật sự.",
+         "Em không chỉ test trên dữ liệu mô phỏng."),
+        ("4. Học từ phản hồi bác sĩ",
+         "Bác sĩ có thể không đồng ý và ghi lý do. Ý kiến đó được đưa vào "
+         "huấn luyện lại với trọng số cao hơn.",
+         "Em không xây AI thay bác sĩ — em xây AI học từ bác sĩ."),
+    ]
+    cot = st.columns(2)
+    for i, (ten, mo_ta, cau_chot) in enumerate(CO_CHE):
+        with cot[i % 2]:
+            st.markdown(
+                f'<div class="bs-coche"><b>{ten}</b><p>{mo_ta}</p>'
+                f"<p><em>{cau_chot}</em></p></div>",
+                unsafe_allow_html=True,
+            )
 
     st.subheader("Ai đã làm phần nào")
     st.write(

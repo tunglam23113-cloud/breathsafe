@@ -1,18 +1,32 @@
 [theme]
 base = "light"
-primaryColor = "#0F766E"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F8FAFC"
-textColor = "#0F172A"
+# primaryColor điều khiển những thứ CSS khó với tới: phần đã tô của thanh
+# trượt, dấu tick của checkbox, viền ô đang focus. Phải cùng tông teal với
+# bảng màu trong app.py, nếu không mấy chi tiết đó sẽ lạc màu.
+primaryColor = "#0E8E80"
+# Nền thật do CSS trong app.py vẽ (gradient bạc hà). Giá trị ở đây chỉ là màu
+# lót phẳng để lúc trang chưa kịp áp CSS không loé lên một khung trắng.
+backgroundColor = "#F3FAF8"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#10263A"
 font = "sans serif"
 
 [server]
 headless = true
 
-# Chỉ lắng nghe trên chính máy này. Mặc định Streamlit mở trên mọi card mạng
-# (0.0.0.0) và in ra "Network URL" + "External URL" — khi đó người khác trong
-# cùng mạng LAN mở được app và đọc được trang Lịch sử ca. Đây là dữ liệu sức
-# khoẻ, và README cam kết "dữ liệu lưu trong máy local".
-# chay_desktop.py cũng truyền --server.address 127.0.0.1 để lệnh chạy đúng kể
-# cả khi thiếu file config này.
-address = "localhost"
+# KHÔNG đặt `address` ở đây, và cũng KHÔNG đặt `port`.
+#
+# Hugging Face Spaces ĐỌC chính file này (tài liệu Spaces nói rõ: nếu có
+# config.toml thì đừng ghi đè cổng mặc định 8501). Bản trước ghim
+# `address = "localhost"`, nghĩa là trong container Space, Streamlit chỉ lắng
+# nghe trên loopback — lớp proxy của Spaces không với tới được, và Space treo ở
+# trạng thái không phản hồi cho tới khi hết giờ khởi động. Không có dòng lỗi nào
+# chỉ ra nguyên nhân.
+#
+# Bỏ dòng đó KHÔNG làm mất tính riêng tư của bản chạy tại máy: cờ dòng lệnh có
+# mức ưu tiên cao hơn file config, mà chay_desktop.py (tức BreathSafe.bat) vẫn
+# truyền thẳng `--server.address 127.0.0.1`. Xem chú thích trong file đó.
+#
+# LƯU Ý khi chạy tay bằng `streamlit run app.py`: lệnh trần này giờ lắng nghe
+# trên mọi card mạng. Muốn giữ máy mình kín thì thêm cờ:
+#     streamlit run app.py --server.address localhost

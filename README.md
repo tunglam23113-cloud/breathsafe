@@ -1,3 +1,16 @@
+---
+title: BreathSafe
+emoji: 🫁
+colorFrom: green
+colorTo: blue
+sdk: streamlit
+sdk_version: "1.41.1"
+python_version: "3.12"
+app_file: app.py
+pinned: false
+short_description: Sàng lọc nguy cơ bệnh hô hấp cho trạm y tế xã — không phải thiết bị y tế
+---
+
 # BreathSafe — phần dự án dự thi
 
 Trợ lý AI hỗ trợ nhân viên y tế tuyến xã sàng lọc sớm nguy cơ bệnh hô hấp.
@@ -26,11 +39,48 @@ duyệt, nên không bị Chrome chặn.
 **Cách 2 — bản web (để phát triển):**
 
 ```bash
-streamlit run app.py
+streamlit run app.py --server.address localhost
 ```
 
 Mở trong tab trình duyệt bình thường. Micro vẫn hoạt động vì chạy trên
 `localhost`, nhưng bản desktop gọn gàng hơn khi demo.
+
+Cờ `--server.address localhost` là cố ý: `.streamlit/config.toml` không còn
+ghim địa chỉ nữa (Hugging Face Spaces đọc chính file đó, xem phần Deploy bên
+dưới), nên lệnh trần `streamlit run app.py` sẽ lắng nghe trên **mọi card mạng**
+— người khác trong cùng mạng LAN mở được app và đọc được trang Lịch sử ca.
+`BreathSafe.bat` không dính chuyện này vì `chay_desktop.py` tự truyền
+`--server.address 127.0.0.1`.
+
+## Deploy lên Hugging Face Spaces
+
+Khối YAML ở đầu file README này là phần cấu hình Space (`sdk: streamlit`,
+`app_file: app.py`, `sdk_version` khớp đúng bản ghim trong `requirements.txt`).
+Thiếu khối đó là Space báo *"configuration error — missing configuration in
+README"*.
+
+```bash
+git init
+git remote add origin https://huggingface.co/spaces/<tên-bạn>/breathsafe
+git add .
+git commit -m "BreathSafe"
+git push origin main
+```
+
+Ba điều cần biết trước khi đẩy lên:
+
+| | |
+|---|---|
+| **Cổng** | Spaces chỉ cho Streamlit dùng cổng mặc định 8501. Đừng thêm `port` vào `.streamlit/config.toml`. |
+| **Địa chỉ** | Cũng đừng thêm lại `address` — xem chú thích dài trong `.streamlit/config.toml`. |
+| **Micro** | Space không có micro nên nút **Ghi tiếng ho** sẽ tự tắt. Phần tiếng ho chỉ dùng được qua ô **tải lên file**. |
+
+Dữ liệu sức khoẻ **không** lên Space: `du_lieu_ho/` (bản ghi tiếng ho) và
+`phan_hoi_bac_si.json` (phản hồi của nhân viên y tế) đều nằm trong
+`.gitignore`. Kiểm tra lại bằng `git status` trước khi commit lần đầu.
+
+`mo_hinh_breathsafe.joblib` thì **phải** được đẩy lên, nếu không app dừng ngay
+ở màn hình "Chưa có mô hình". File này ~7 MB, dưới ngưỡng cần Git LFS.
 
 ## Các file trong thư mục này
 
